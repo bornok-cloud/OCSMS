@@ -26,6 +26,16 @@ class _GuestTrackOrderScreenState extends State<GuestTrackOrderScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant GuestTrackOrderScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialOrderNumber != null && widget.initialOrderNumber != oldWidget.initialOrderNumber) {
+      _ctrl.text = widget.initialOrderNumber!;
+      _submitted = true;
+      setState(() {});
+    }
+  }
+
+  @override
   void dispose() {
     _ctrl.dispose();
     super.dispose();
@@ -36,6 +46,7 @@ class _GuestTrackOrderScreenState extends State<GuestTrackOrderScreen> {
       case 'preparing':
         return Colors.orange.shade800;
       case 'ready':
+      case 'completed':
         return AppColors.success;
       case 'declined':
       case 'cancelled':
@@ -51,6 +62,7 @@ class _GuestTrackOrderScreenState extends State<GuestTrackOrderScreen> {
     int currentStep = 0;
     if (s == 'preparing') currentStep = 1;
     if (s == 'ready') currentStep = 2;
+    if (s == 'completed') currentStep = 3;
     if (s == 'declined' || s == 'cancelled' || s == 'expired') currentStep = -1;
 
     if (currentStep == -1) {
@@ -74,7 +86,7 @@ class _GuestTrackOrderScreenState extends State<GuestTrackOrderScreen> {
       );
     }
 
-    const steps = ['Pending', 'Preparing', 'Ready'];
+    const steps = ['Pending', 'Preparing', 'Ready', 'Complete'];
     return Row(
       children: List.generate(steps.length, (i) {
         final active = i <= currentStep;
@@ -87,28 +99,28 @@ class _GuestTrackOrderScreenState extends State<GuestTrackOrderScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      width: 24,
-                      height: 24,
+                      width: 20,
+                      height: 20,
                       decoration: BoxDecoration(
                         color: active ? Colors.black : AppColors.beige,
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: isCurrent ? Colors.black : Colors.transparent,
-                          width: 2,
+                          width: 1.8,
                         ),
                       ),
                       alignment: Alignment.center,
                       child: Icon(
                         i < currentStep ? Icons.check_rounded : (i == currentStep ? Icons.radio_button_checked_rounded : Icons.circle),
-                        size: i == currentStep ? 14 : 8,
+                        size: i == currentStep ? 11 : 6,
                         color: active ? Colors.white : AppColors.textMuted,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Text(
                       steps[i],
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 9,
                         fontWeight: isCurrent ? FontWeight.w900 : FontWeight.w600,
                         color: active ? Colors.black : AppColors.textMuted,
                       ),
@@ -248,6 +260,25 @@ class _GuestTrackOrderScreenState extends State<GuestTrackOrderScreen> {
     );
   }
 
+  OrderRecord _transactionToRecord(TransactionRecord tx) {
+    final ref = tx.orderNumber ?? (tx.id.length > 4 ? tx.id.substring(tx.id.length - 4) : tx.id);
+    return OrderRecord(
+      id: tx.id,
+      items: tx.items,
+      source: 'Kiosk',
+      status: 'Completed',
+      createdAt: tx.timestamp,
+      customerName: tx.customerName,
+      paymentMethod: tx.paymentMethod ?? 'Cash',
+      orderNumber: ref,
+      orderType: tx.orderType ?? 'Dine In',
+      discount: tx.discount,
+      receipt: tx.receipt,
+      isGuest: tx.isGuest,
+      tableNumber: tx.tableNumber,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -309,7 +340,8 @@ class _GuestTrackOrderScreenState extends State<GuestTrackOrderScreen> {
                     child: AnimatedBuilder(
                       animation: AppData.instance,
                       builder: (context, _) {
-                        final query = _ctrl.text.trim().toUpperCase();
+                        final rawQuery = _ctrl.text.trim().toUpperCase();
+                        final query = rawQuery.startsWith('#') ? rawQuery.substring(1) : rawQuery;
                         OrderRecord? match;
                         if (query.isNotEmpty) {
                           try {
@@ -320,7 +352,16 @@ class _GuestTrackOrderScreenState extends State<GuestTrackOrderScreen> {
                                   (o.orderNumber != null && o.orderNumber!.toUpperCase() == query),
                             );
                           } catch (_) {
-                            match = null;
+                            try {
+                              final tx = AppData.instance.transactions.firstWhere(
+                                (t) =>
+                                    t.id.toUpperCase() == query ||
+                                    (t.orderNumber != null && t.orderNumber!.toUpperCase() == query),
+                              );
+                              match = _transactionToRecord(tx);
+                            } catch (_) {
+                              match = null;
+                            }
                           }
                         }
 
@@ -353,7 +394,7 @@ class _GuestTrackOrderScreenState extends State<GuestTrackOrderScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'No active order matches "${_ctrl.text.trim()}".',
+                                  'No active or completed order matches "${_ctrl.text.trim()}".',
                                   style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
                                 ),
                               ],
