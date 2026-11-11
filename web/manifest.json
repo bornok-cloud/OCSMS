@@ -1,11 +1,11 @@
 {
-    "name": "cafe_management_system",
-    "short_name": "cafe_management_system",
+    "name": "Overnight Cafe",
+    "short_name": "Overnight Cafe",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#2C221E",
+    "theme_color": "#2C221E",
+    "description": "Sip, Savour & Stay Overnight. Order online or walk-in at Overnight Cafe.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
