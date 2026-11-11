@@ -263,7 +263,7 @@ class _LoginScreenState extends State<LoginScreen> {
               );
             },
             icon: const Icon(Icons.storefront_outlined, size: 18),
-            label: const Text('Order as Walk in customer', style: TextStyle(fontWeight: FontWeight.bold)),
+            label: const Text('Order as Walk in Customer', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
           const SizedBox(height: 18),
           Wrap(
