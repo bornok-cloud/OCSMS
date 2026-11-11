@@ -1,12 +1,9 @@
 import 'dart:ui' as ui;
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr/qr.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:web/web.dart' as web;
-import 'dart:js_interop';
 import '../../theme/app_theme.dart';
 import '../../widgets/shared_widgets.dart';
 import '../guest/guest_ordering_shell.dart';
@@ -25,19 +22,6 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
         builder: (_) => const GuestOrderingShell(),
       ),
     );
-  }
-
-  void _downloadBytesWeb(Uint8List bytes, String filename) {
-    final blob = web.Blob([bytes.buffer.toJS].toJS, web.BlobPropertyBag(type: 'image/png'));
-    final url = web.URL.createObjectURL(blob);
-    final anchor = web.document.createElement('a') as web.HTMLAnchorElement
-      ..href = url
-      ..style.display = 'none'
-      ..download = filename;
-    web.document.body?.appendChild(anchor);
-    anchor.click();
-    web.document.body?.removeChild(anchor);
-    web.URL.revokeObjectURL(url);
   }
 
   Future<Uint8List> _generateBrandedQrImageBytes(QrImage qrImage) async {
@@ -144,20 +128,16 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
     return byteData!.buffer.asUint8List();
   }
 
+  static const String walkInQrUrl = 'https://overnightcafe-app.web.app/#/walk-in-order';
+
   Future<void> _downloadQrCode() async {
     try {
-      const qrPayload = 'https://overnightcafe.system/walk-in-order';
-      final qrCode = QrCode(4, QrErrorCorrectLevel.L)..addData(qrPayload);
+      final qrCode = QrCode(4, QrErrorCorrectLevel.L)..addData(walkInQrUrl);
       final qrImage = QrImage(qrCode);
 
       final bytes = await _generateBrandedQrImageBytes(qrImage);
 
-      if (kIsWeb) {
-        _downloadBytesWeb(bytes, 'walk_in_counter_qr.png');
-        if (mounted) {
-          showAppSnack(context, 'Walk-In QR Code downloaded successfully!');
-        }
-      } else {
+      try {
         final result = await FilePicker.platform.saveFile(
           dialogTitle: 'Save Walk-In QR Code',
           fileName: 'walk_in_counter_qr.png',
@@ -166,19 +146,56 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
         );
         if (mounted && result != null) {
           showAppSnack(context, 'Walk-In QR Code downloaded successfully!');
+          return;
         }
+      } catch (_) {
+        // Fallback for web or platforms where saveFile is unsupported
+      }
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Walk-In QR Code', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.darkBrown)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 280, maxWidth: 280),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.memory(bytes, fit: BoxFit.contain),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Long-press or right-click the image above to save it to your device.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.darkBrown, foregroundColor: Colors.white),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
-        showAppSnack(context, 'Failed to download QR code: $e', success: false);
+        showAppSnack(context, 'Failed to generate QR code: $e', success: false);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    const qrPayload = 'https://overnightcafe.system/walk-in-order';
-    final qrCode = QrCode(4, QrErrorCorrectLevel.L)..addData(qrPayload);
+    final qrCode = QrCode(4, QrErrorCorrectLevel.L)..addData(walkInQrUrl);
     final qrImage = QrImage(qrCode);
 
     return Padding(
@@ -329,7 +346,7 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                           onPressed: () {
-                            Clipboard.setData(const ClipboardData(text: qrPayload));
+                            Clipboard.setData(const ClipboardData(text: walkInQrUrl));
                             showAppSnack(context, 'Walk-in ordering link copied to clipboard!');
                           },
                           icon: const Icon(Icons.copy_rounded, size: 15),

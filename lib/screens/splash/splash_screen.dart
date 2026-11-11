@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../services/app_data.dart';
@@ -6,6 +7,7 @@ import '../../models/models.dart';
 import '../admin/admin_shell.dart';
 import '../employee/employee_shell.dart';
 import '../customer/customer_shell.dart';
+import '../guest/guest_ordering_shell.dart';
 import '../landing/landing_page.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -48,6 +50,17 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     await minSplashTime;
 
     if (!mounted) return;
+
+    // Check if opened via Walk-In QR Code URL on web
+    if (kIsWeb) {
+      final uriString = Uri.base.toString().toLowerCase();
+      if (uriString.contains('walk-in') || uriString.contains('guest')) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const GuestOrderingShell()),
+        );
+        return;
+      }
+    }
 
     final user = AppData.instance.currentUser;
     Widget target = const LandingPage();
