@@ -262,8 +262,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 MaterialPageRoute(builder: (_) => const GuestOrderingShell()),
               );
             },
-            icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
-            label: const Text('Scan QR / Order as Walk-In', style: TextStyle(fontWeight: FontWeight.bold)),
+            icon: const Icon(Icons.storefront_outlined, size: 18),
+            label: const Text('Order as Walk in customer', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
           const SizedBox(height: 18),
           Wrap(
