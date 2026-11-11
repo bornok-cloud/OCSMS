@@ -3,9 +3,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr/qr.dart';
-import 'package:file_picker/file_picker.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/shared_widgets.dart';
+import '../../utils/file_download.dart';
 import '../guest/guest_ordering_shell.dart';
 
 class QrGeneratorScreen extends StatefulWidget {
@@ -136,59 +136,14 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
       final qrImage = QrImage(qrCode);
 
       final bytes = await _generateBrandedQrImageBytes(qrImage);
+      final downloaded = await saveOrDownloadBytes(bytes, 'walk_in_counter_qr.png');
 
-      try {
-        final result = await FilePicker.platform.saveFile(
-          dialogTitle: 'Save Walk-In QR Code',
-          fileName: 'walk_in_counter_qr.png',
-          bytes: bytes,
-          type: FileType.image,
-        );
-        if (mounted && result != null) {
-          showAppSnack(context, 'Walk-In QR Code downloaded successfully!');
-          return;
-        }
-      } catch (_) {
-        // Fallback for web or platforms where saveFile is unsupported
-      }
-
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Walk-In QR Code', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.darkBrown)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 280, maxWidth: 280),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.memory(bytes, fit: BoxFit.contain),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Long-press or right-click the image above to save it to your device.',
-                  style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-            actions: [
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.darkBrown, foregroundColor: Colors.white),
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Close'),
-              ),
-            ],
-          ),
-        );
+      if (mounted && downloaded) {
+        showAppSnack(context, 'Walk-In QR Code PNG downloaded successfully!');
       }
     } catch (e) {
       if (mounted) {
-        showAppSnack(context, 'Failed to generate QR code: $e', success: false);
+        showAppSnack(context, 'Failed to download QR code: $e', success: false);
       }
     }
   }
