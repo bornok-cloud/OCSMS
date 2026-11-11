@@ -9,6 +9,7 @@ import '../customer/customer_shell.dart';
 import '../landing/landing_page.dart';
 import 'register_screen.dart';
 import 'password_reset_screen.dart';
+import '../guest/guest_ordering_shell.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -246,6 +247,23 @@ class _LoginScreenState extends State<LoginScreen> {
             label: 'Login',
             loading: _submitting,
             onPressed: _login,
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.darkBrown,
+              side: const BorderSide(color: AppColors.darkBrown, width: 1.2),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const GuestOrderingShell()),
+              );
+            },
+            icon: const Icon(Icons.storefront_outlined, size: 18),
+            label: const Text('Order as Walk in customer', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
           const SizedBox(height: 18),
           Wrap(
