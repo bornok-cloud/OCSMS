@@ -83,11 +83,17 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Reply to $customerName\'s Feedback'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppColors.cardWhite,
+        title: Text('Reply to $customerName\'s Feedback', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.darkBrown)),
         content: TextField(
           controller: ctrl,
           maxLines: 3,
-          decoration: const InputDecoration(hintText: 'Write your reply...'),
+          decoration: InputDecoration(
+            hintText: 'Write your reply...',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          autofocus: true,
         ),
         actions: [
           TextButton(
@@ -95,9 +101,20 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.darkBrown,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
             onPressed: () {
-              setState(() => AppData.instance.markFeedbackReviewed(id, reply: ctrl.text.trim()));
+              final replyText = ctrl.text.trim();
+              if (replyText.isEmpty) {
+                showAppSnack(context, 'Reply cannot be empty.', success: false);
+                return;
+              }
+              setState(() => AppData.instance.markFeedbackReviewed(id, reply: replyText));
               Navigator.pop(ctx);
+              showAppSnack(context, 'Reply sent to $customerName successfully!');
             },
             child: const Text('Send Reply'),
           ),
