@@ -117,6 +117,83 @@ class _GuestOrderingShellState extends State<GuestOrderingShell> {
     showAppSnack(context, 'Your Order ID has expired. Please place your order again.', success: false);
   }
 
+  Future<void> _handleExitPrompt() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppColors.cardWhite,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.danger.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.exit_to_app_rounded,
+                color: AppColors.danger,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Exit Walk-In Ordering',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: AppColors.darkBrown,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to exit walk-in ordering?',
+          style: TextStyle(
+            fontSize: 13.5,
+            color: AppColors.darkBrown,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        actions: [
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.darkBrown,
+              side: const BorderSide(color: AppColors.beigeDark, width: 1.2),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirm Exit', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (r) => false,
+      );
+    }
+  }
+
   @override
   void dispose() {
     AppData.instance.removeListener(_checkActiveOrderStatus);
@@ -130,45 +207,61 @@ class _GuestOrderingShellState extends State<GuestOrderingShell> {
     final wide = MediaQuery.of(context).size.width >= 900;
     final showCard = wide && _activeOrder != null && !_modalOpen;
 
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: AppShell(
-            title: 'Overnight Cafe (Guest - $_tableNumber)',
-            logoAsset: 'assets/images/OC_NAVBAR_LOGO.png',
-            profileScreen: null,
-            hideDrawer: true,
-            mobileBottomNavigation: true,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  tooltip: 'Track Order',
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => GuestTrackOrderScreen(
-                          initialOrderNumber: _activeOrder?.displayOrderNumber,
-                        ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.search_rounded, color: Colors.white),
-                ),
-                if (_activeOrder != null)
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          _handleExitPrompt();
+        }
+      },
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: AppShell(
+              title: 'Overnight Cafe (Guest - $_tableNumber)',
+              logoAsset: 'assets/images/OC_NAVBAR_LOGO.png',
+              profileScreen: null,
+              hideDrawer: true,
+              mobileBottomNavigation: true,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   IconButton(
-                    tooltip: 'View active order and countdown',
-                    onPressed: _showOrderModal,
-                    icon: const Badge(child: Icon(Icons.receipt_long_rounded, color: Colors.white)),
+                    tooltip: 'Track Order',
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => GuestTrackOrderScreen(
+                            initialOrderNumber: _activeOrder?.displayOrderNumber,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.search_rounded, color: Colors.white),
                   ),
-              ],
-            ),
-            onLogout: () {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (r) => false,
-              );
-            },
+                  if (_activeOrder != null)
+                    IconButton(
+                      tooltip: 'View active order and countdown',
+                      onPressed: _showOrderModal,
+                      icon: const Badge(child: Icon(Icons.receipt_long_rounded, color: Colors.white)),
+                    ),
+                  const SizedBox(width: 4),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.white70, width: 1.1),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: _handleExitPrompt,
+                    icon: const Icon(Icons.exit_to_app_rounded, size: 15, color: Colors.white),
+                    label: const Text('Exit', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                  ),
+                ],
+              ),
+              onLogout: _handleExitPrompt,
             items: [
               NavItem(
                 icon: Icons.storefront_outlined,
@@ -202,6 +295,7 @@ class _GuestOrderingShellState extends State<GuestOrderingShell> {
             ),
           ),
       ],
+    ),
     );
   }
 }
