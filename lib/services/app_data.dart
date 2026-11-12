@@ -1570,6 +1570,7 @@ class AppData extends ChangeNotifier {
                   : null,
               isGuest: data['isGuest'] as bool? ?? false,
               tableNumber: data['tableNumber'] as String?,
+              proofOfPaymentBase64: data['proofOfPaymentBase64'] as String?,
               archivedByAdmin: data['archivedByAdmin'] as bool? ?? false,
             ));
           } catch (e) {
@@ -2415,6 +2416,7 @@ class AppData extends ChangeNotifier {
       String? paymentMethod,
       String? orderNumber,
       double? verifiedTotal,
+      String? proofOfPaymentBase64,
       String orderType = 'Dine In',
       // Receipt generated for this sale (kiosk orders only) — stored on
       // the transaction so it stays linked to the order after completion.
@@ -2448,6 +2450,7 @@ class AppData extends ChangeNotifier {
       'customerName': customerName,
       if (paymentMethod != null) 'paymentMethod': paymentMethod,
       'orderNumber': resolvedOrderNumber,
+      if (proofOfPaymentBase64 != null) 'proofOfPaymentBase64': proofOfPaymentBase64,
       if (receipt != null) 'receipt': receipt,
     });
 
@@ -2470,6 +2473,7 @@ class AppData extends ChangeNotifier {
       customerName: customerName,
       paymentMethod: paymentMethod,
       orderNumber: resolvedOrderNumber,
+      proofOfPaymentBase64: proofOfPaymentBase64,
     );
   }
 
@@ -2762,6 +2766,7 @@ class AppData extends ChangeNotifier {
       customerName: orderData['customerName'] as String?,
       paymentMethod: orderData['paymentMethod'] as String?,
       orderNumber: orderData['orderNumber'] as String?,
+      proofOfPaymentBase64: orderData['proofOfPaymentBase64'] as String?,
       verifiedTotal: verifiedTotal,
       receipt: orderData['receipt'] is Map
           ? Map<String, dynamic>.from(orderData['receipt'] as Map)

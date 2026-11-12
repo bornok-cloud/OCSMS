@@ -602,6 +602,9 @@ class TransactionRecord {
   /// Optional table number where the guest is seated.
   final String? tableNumber;
 
+  /// Base64-encoded image of the GCash payment receipt for GCash or Split Payment orders.
+  final String? proofOfPaymentBase64;
+
   TransactionRecord({
     required this.id,
     required this.items,
@@ -619,6 +622,7 @@ class TransactionRecord {
     this.archivedByAdmin = false,
     this.isGuest = false,
     this.tableNumber,
+    this.proofOfPaymentBase64,
   });
 
   /// Receipt only if it matches this sale's customer and Order ID.

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../models/models.dart';
@@ -19,6 +20,7 @@ class _OrderHistoryEntry {
   final DateTime date;
   final String? declineReason;
   final ReceiptRecord? receipt;
+  final String? proofOfPaymentBase64;
 
   _OrderHistoryEntry({
     required this.id,
@@ -29,6 +31,7 @@ class _OrderHistoryEntry {
     required this.date,
     this.declineReason,
     this.receipt,
+    this.proofOfPaymentBase64,
   });
 }
 
@@ -88,6 +91,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                     status: 'Completed',
                     date: transaction.timestamp,
                     receipt: transaction.linkedReceipt,
+                    proofOfPaymentBase64: transaction.proofOfPaymentBase64,
                   ),
                 ),
           ],
@@ -177,6 +181,39 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                         if (entry.receipt != null) ...[
                           const SizedBox(width: 6),
                           OrderCardReceipt(receipt: entry.receipt, showWhenMissing: false),
+                        ],
+                        if (entry.proofOfPaymentBase64 != null) ...[
+                          const SizedBox(width: 6),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.darkBrown,
+                              side: const BorderSide(color: AppColors.beigeDark, width: 1.1),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: Text('GCash Receipt — #${entry.displayId}'),
+                                  content: SizedBox(
+                                    width: 360,
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Image.memory(base64Decode(entry.proofOfPaymentBase64!), fit: BoxFit.contain),
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+                                  ],
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.receipt_long_outlined, size: 14),
+                            label: const Text('View GCash', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
                         ],
                         const SizedBox(width: 4),
                         InkWell(
