@@ -4,6 +4,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/shared_widgets.dart';
 import '../../services/app_data.dart';
 import '../../models/models.dart';
+import '../../utils/web_back_guard.dart';
 import 'guest_track_order_screen.dart';
 import '../customer/customer_kiosk_screen.dart';
 import '../auth/login_screen.dart';
@@ -23,12 +24,14 @@ class _GuestOrderingShellState extends State<GuestOrderingShell> {
   final ValueNotifier<Duration> _remaining = ValueNotifier<Duration>(const Duration(minutes: 20));
   Timer? _countdown;
   bool _modalOpen = false;
+  StreamSubscription? _webBackGuardSub;
 
   @override
   void initState() {
     super.initState();
     _tableNumber = widget.initialTableNumber ?? 'Table 1';
     AppData.instance.addListener(_checkActiveOrderStatus);
+    _webBackGuardSub = setupWebBackGuard(_handleExitPrompt);
   }
 
   static const Duration _orderValidity = Duration(minutes: 20);
@@ -187,6 +190,7 @@ class _GuestOrderingShellState extends State<GuestOrderingShell> {
     );
 
     if (confirm == true && mounted) {
+      _webBackGuardSub?.cancel();
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
         (r) => false,
@@ -196,6 +200,7 @@ class _GuestOrderingShellState extends State<GuestOrderingShell> {
 
   @override
   void dispose() {
+    _webBackGuardSub?.cancel();
     AppData.instance.removeListener(_checkActiveOrderStatus);
     _countdown?.cancel();
     _remaining.dispose();
