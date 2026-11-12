@@ -320,7 +320,10 @@ class KioskManagementScreen extends StatelessWidget {
         change: change,
       );
     } else if (o.paymentMethod == 'Split Payment' || o.paymentMethod == 'Multi Payment') {
-      final gcashController = TextEditingController();
+      final defaultGcash = o.extractedAmount ?? 0.0;
+      final gcashController = TextEditingController(
+        text: defaultGcash > 0 ? defaultGcash.toStringAsFixed(2) : '',
+      );
       final cashTenderedController = TextEditingController();
       final input = await showDialog<_SplitInput>(
         context: context,
