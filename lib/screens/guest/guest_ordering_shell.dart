@@ -120,7 +120,7 @@ class _GuestOrderingShellState extends State<GuestOrderingShell> {
     showAppSnack(context, 'Your Order ID has expired. Please place your order again.', success: false);
   }
 
-  Future<void> _handleExitPrompt() async {
+  Future<bool> _handleExitPrompt() async {
     final confirm = await showDialog<bool>(
       context: context,
       barrierDismissible: true,
@@ -196,6 +196,7 @@ class _GuestOrderingShellState extends State<GuestOrderingShell> {
         (r) => false,
       );
     }
+    return confirm == true;
   }
 
   @override
