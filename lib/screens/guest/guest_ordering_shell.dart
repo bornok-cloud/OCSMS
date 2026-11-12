@@ -229,6 +229,7 @@ class _GuestOrderingShellState extends State<GuestOrderingShell> {
               profileScreen: null,
               hideDrawer: true,
               mobileBottomNavigation: true,
+              onBack: _handleExitPrompt,
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

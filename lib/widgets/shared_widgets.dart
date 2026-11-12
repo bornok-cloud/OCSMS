@@ -141,6 +141,9 @@ class AppShell extends StatefulWidget {
 
   /// Optional: label of the nav item that gets a small "LIVE" tag.
   final String? liveItemLabel;
+
+  /// Optional custom back handler (overrides default showExitConfirmationDialog)
+  final Future<bool> Function()? onBack;
   const AppShell({
     super.key,
     required this.title,
@@ -156,6 +159,7 @@ class AppShell extends StatefulWidget {
     this.mobileBottomNavigation = false,
     this.sidebarFooter,
     this.liveItemLabel,
+    this.onBack,
   });
 
   static AppShellState? of(BuildContext context) =>
@@ -266,6 +270,10 @@ class AppShellState extends State<AppShell> {
         _settingsIndex = null;
         _selected = rootIndex;
       });
+      return true;
+    }
+    if (widget.onBack != null) {
+      await widget.onBack!();
       return true;
     }
     await showExitConfirmationDialog(context);
