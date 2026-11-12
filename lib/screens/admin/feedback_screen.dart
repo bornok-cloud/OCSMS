@@ -106,15 +106,17 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            onPressed: () {
+            onPressed: () async {
               final replyText = ctrl.text.trim();
               if (replyText.isEmpty) {
                 showAppSnack(context, 'Reply cannot be empty.', success: false);
                 return;
               }
-              setState(() => AppData.instance.markFeedbackReviewed(id, reply: replyText));
-              Navigator.pop(ctx);
-              showAppSnack(context, 'Reply sent to $customerName successfully!');
+              Navigator.pop(ctx); // Close modal immediately
+              await AppData.instance.markFeedbackReviewed(id, reply: replyText);
+              if (context.mounted) {
+                showAppSnack(context, 'Reply sent to $customerName successfully!');
+              }
             },
             child: const Text('Send Reply'),
           ),
