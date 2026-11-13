@@ -230,30 +230,18 @@ class _GuestOrderingShellState extends State<GuestOrderingShell> {
               hideDrawer: true,
               mobileBottomNavigation: true,
               onBack: _handleExitPrompt,
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    tooltip: 'Track Order',
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => GuestTrackOrderScreen(
-                            initialOrderNumber: _activeOrder?.displayOrderNumber,
-                          ),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.search_rounded, color: Colors.black),
-                  ),
-                  if (_activeOrder != null)
-                    IconButton(
+              leading: IconButton(
+                tooltip: 'Exit Walk-In Ordering',
+                onPressed: _handleExitPrompt,
+                icon: const Icon(Icons.arrow_back_rounded, color: Colors.black),
+              ),
+              trailing: _activeOrder != null
+                  ? IconButton(
                       tooltip: 'View active order and countdown',
                       onPressed: _showOrderModal,
                       icon: const Badge(child: Icon(Icons.receipt_long_rounded, color: Colors.black)),
-                    ),
-                ],
-              ),
+                    )
+                  : null,
               onLogout: _handleExitPrompt,
             items: [
               NavItem(
