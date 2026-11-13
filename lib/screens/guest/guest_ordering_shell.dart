@@ -230,11 +230,6 @@ class _GuestOrderingShellState extends State<GuestOrderingShell> {
               hideDrawer: true,
               mobileBottomNavigation: true,
               onBack: _handleExitPrompt,
-              leading: IconButton(
-                tooltip: 'Exit Walk-In Ordering',
-                onPressed: _handleExitPrompt,
-                icon: const Icon(Icons.arrow_back_rounded, color: Colors.black),
-              ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
