@@ -52,7 +52,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       fullQueryString += '?' + uri.fragment.toLowerCase();
     }
 
-    if (fullQueryString.contains('walk-in') || fullQueryString.contains('guest') || fullQueryString.contains('table')) {
+    if (fullQueryString.contains('walk-in') || fullQueryString.contains('walk_in') || fullQueryString.contains('guest') || fullQueryString.contains('table')) {
       await minSplashTime;
       if (!mounted) return;
 
