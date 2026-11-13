@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -833,14 +834,14 @@ class _MessagingScreenState extends State<MessagingScreen> {
         // 1. Sidebar/List of conversations
         final list = Container(
           width: wide ? 320 : double.infinity,
-          color: AppColors.cardWhite,
+          color: Colors.white.withValues(alpha: 0.40),
           child: Column(
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  border: Border(bottom: BorderSide(color: AppColors.border, width: 0.8)),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.65),
+                  border: const Border(bottom: BorderSide(color: AppColors.border, width: 0.8)),
                 ),
                 child: Row(
                   children: [
@@ -1109,9 +1110,9 @@ class _MessagingScreenState extends State<MessagingScreen> {
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: const BoxDecoration(
-                color: AppColors.beige,
-                border: Border(bottom: BorderSide(color: AppColors.border, width: 0.8)),
+              decoration: BoxDecoration(
+                color: AppColors.beige.withValues(alpha: 0.65),
+                border: const Border(bottom: BorderSide(color: AppColors.border, width: 0.8)),
               ),
               child: Row(
                 children: [
@@ -1345,9 +1346,9 @@ class _MessagingScreenState extends State<MessagingScreen> {
         ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: const BoxDecoration(
-                color: AppColors.cardWhite,
-                border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.75),
+                border: const Border(top: BorderSide(color: AppColors.border, width: 0.5)),
               ),
               child: Row(
                 children: [
@@ -1406,12 +1407,29 @@ class _MessagingScreenState extends State<MessagingScreen> {
           child: Container(
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-              color: AppColors.cardWhite,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.border, width: 1.2),
-              boxShadow: AppShadows.soft,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
-            child: content,
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.82),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    width: 1.5,
+                  ),
+                ),
+                child: content,
+              ),
+            ),
           ),
         );
       },
