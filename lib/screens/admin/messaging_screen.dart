@@ -95,6 +95,26 @@ class _MessagingScreenState extends State<MessagingScreen> {
     }
   }
 
+  String _formatTileTime(DateTime dt) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final msgDay = DateTime(dt.year, dt.month, dt.day);
+    final diffDays = today.difference(msgDay).inDays;
+
+    final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final minute = dt.minute.toString().padLeft(2, '0');
+    final period = dt.hour < 12 ? 'AM' : 'PM';
+    final timeStr = '$hour12:$minute $period';
+
+    if (diffDays == 0) {
+      return timeStr;
+    } else if (diffDays == 1) {
+      return 'Yesterday';
+    } else {
+      return '${dt.month}/${dt.day}/${dt.year.toString().substring(2)}';
+    }
+  }
+
   Widget _buildDateSeparator(String text) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 10),
@@ -816,42 +836,63 @@ class _MessagingScreenState extends State<MessagingScreen> {
           color: AppColors.cardWhite,
           child: Column(
             children: [
-              Padding(
+              Container(
                 padding: const EdgeInsets.all(12),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(bottom: BorderSide(color: AppColors.border, width: 0.8)),
+                ),
                 child: Row(
                   children: [
                     Expanded(
                       child: TextField(
                         controller: _searchCtrl,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           hintText: 'Search chats...',
-                          prefixIcon: Icon(Icons.search),
+                          prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppColors.textMuted),
                           isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.darkBrown, width: 1.5)),
+                          fillColor: AppColors.cream,
+                          filled: true,
                         ),
                         onChanged: (_) => setState(() {}),
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      icon: const Icon(Icons.chat_bubble_outline, color: AppColors.brown),
-                      tooltip: 'New Chat',
-                      onPressed: () => _showNewChatDialog(context),
+                    const SizedBox(width: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.darkBrown,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 18),
+                        tooltip: 'New Chat',
+                        onPressed: () => _showNewChatDialog(context),
+                      ),
                     ),
                     if (_isAdmin) ...[
-                      const SizedBox(width: 2),
-                      IconButton(
-                        icon: const Icon(Icons.group_add_outlined, color: AppColors.brown),
-                        tooltip: 'New Group Chat',
-                        onPressed: () => _createNewGroupDialog(context),
-                      )
+                      const SizedBox(width: 6),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.group_add_outlined, color: Colors.white, size: 18),
+                          tooltip: 'New Group Chat',
+                          onPressed: () => _createNewGroupDialog(context),
+                        ),
+                      ),
                     ]
                   ],
                 ),
               ),
-              const Divider(height: 1),
               Expanded(
                 child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
                   itemCount: convos.length,
                   itemBuilder: (ctx, i) {
                     final c = convos[i];
@@ -881,6 +922,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
                     final senderFirstName = last != null ? getFirstNameOnly(last.sender) : '';
                     final hasImage = last != null && last.imageUrl != null && last.imageUrl!.isNotEmpty;
                     final hasFile = last != null && last.fileData != null && last.fileData!.isNotEmpty;
+                    final timeLabel = last != null ? _formatTileTime(last.timestamp) : '';
 
                     String subtitleText = 'No messages yet';
                     if (last != null) {
@@ -917,63 +959,130 @@ class _MessagingScreenState extends State<MessagingScreen> {
                       }
                     }
 
-                    return ListTile(
-                      selected: wide && isSelected,
-                      selectedTileColor: AppColors.beige,
-                      leading: _buildUserAvatar(c.isGroup ? '' : displayTitle, radius: 20, isGroup: c.isGroup, conversation: c),
-                      title: Text(
-                        displayTitle, 
-                        style: TextStyle(
-                          fontWeight: unread ? FontWeight.bold : FontWeight.w600, 
-                          fontSize: 14,
-                          color: unread ? AppColors.darkBrown : AppColors.darkBrown.withValues(alpha: 0.9),
-                        ),
-                      ),
-                      subtitle: Text(
-                        subtitleText,
-                        maxLines: 1, 
-                        overflow: TextOverflow.ellipsis, 
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: unread ? FontWeight.bold : FontWeight.normal,
-                          color: unread ? Colors.black : AppColors.textMuted,
-                        ),
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (unread)
-                            Container(
-                              width: 10,
-                              height: 10,
-                              margin: const EdgeInsets.only(right: 10),
-                              decoration: const BoxDecoration(
-                                color: AppColors.accent,
-                                shape: BoxShape.circle,
-                              ),
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      child: InkWell(
+                        onTap: () {
+                          setState(() {
+                            _selectedId = c.id;
+                            _showChatMobile = true;
+                          });
+                          AppData.instance.markMessagesAsRead(c.id, _senderName);
+                          _scrollToBottom();
+                          WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+                          Future.delayed(const Duration(milliseconds: 50), () => _scrollToBottom());
+                          Future.delayed(const Duration(milliseconds: 150), () => _scrollToBottom());
+                        },
+                        borderRadius: BorderRadius.circular(14),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: wide && isSelected ? AppColors.beige : Colors.transparent,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: wide && isSelected ? AppColors.beigeDark : Colors.transparent,
+                              width: 1,
                             ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.textMuted),
-                            tooltip: 'Delete conversation',
-                            splashRadius: 18,
-                            visualDensity: VisualDensity.compact,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            onPressed: () => _confirmDeleteConversation(c, displayTitle),
                           ),
-                        ],
+                          child: Row(
+                            children: [
+                              if (wide && isSelected)
+                                Container(
+                                  width: 3.5,
+                                  height: 32,
+                                  margin: const EdgeInsets.only(right: 8),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.darkBrown,
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                ),
+                              _buildUserAvatar(c.isGroup ? '' : displayTitle, radius: 20, isGroup: c.isGroup, conversation: c),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            displayTitle,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontWeight: unread ? FontWeight.w900 : FontWeight.w700,
+                                              fontSize: 13.5,
+                                              color: AppColors.darkBrown,
+                                            ),
+                                          ),
+                                        ),
+                                        if (timeLabel.isNotEmpty) ...[
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            timeLabel,
+                                            style: TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight: unread ? FontWeight.bold : FontWeight.normal,
+                                              color: unread ? AppColors.darkBrown : AppColors.textMuted,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            subtitleText,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: unread ? FontWeight.w800 : FontWeight.normal,
+                                              color: unread ? Colors.black : AppColors.textMuted,
+                                            ),
+                                          ),
+                                        ),
+                                        if (unread) ...[
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.accent,
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: const Text(
+                                              'NEW',
+                                              style: TextStyle(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w900,
+                                                color: Colors.white,
+                                                letterSpacing: 0.5,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                        ],
+                                        IconButton(
+                                          icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.textMuted),
+                                          tooltip: 'Delete conversation',
+                                          splashRadius: 16,
+                                          visualDensity: VisualDensity.compact,
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                          onPressed: () => _confirmDeleteConversation(c, displayTitle),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      onTap: () {
-                        setState(() {
-                          _selectedId = c.id;
-                          _showChatMobile = true;
-                        });
-                        AppData.instance.markMessagesAsRead(c.id, _senderName);
-                        _scrollToBottom();
-                        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-                        Future.delayed(const Duration(milliseconds: 50), () => _scrollToBottom());
-                        Future.delayed(const Duration(milliseconds: 150), () => _scrollToBottom());
-                      },
                     );
                   },
                 ),
