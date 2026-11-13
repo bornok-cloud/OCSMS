@@ -144,6 +144,9 @@ class AppShell extends StatefulWidget {
 
   /// Optional custom back handler (overrides default showExitConfirmationDialog)
   final Future<bool> Function()? onBack;
+
+  /// Optional leading widget in the top app bar header (e.g. back button).
+  final Widget? leading;
   const AppShell({
     super.key,
     required this.title,
@@ -160,6 +163,7 @@ class AppShell extends StatefulWidget {
     this.sidebarFooter,
     this.liveItemLabel,
     this.onBack,
+    this.leading,
   });
 
   static AppShellState? of(BuildContext context) =>
@@ -881,6 +885,10 @@ class AppShellState extends State<AppShell> {
                           ),
                           child: Row(
                             children: [
+                              if (widget.leading != null) ...[
+                                widget.leading!,
+                                const SizedBox(width: 14),
+                              ],
                               Expanded(
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
@@ -946,6 +954,7 @@ class AppShellState extends State<AppShell> {
         // Mobile layout
         return Scaffold(
           appBar: AppBar(
+            leading: widget.leading,
             title: Text(item.label),
             actions: [
               if (widget.trailing != null) ...[

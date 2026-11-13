@@ -230,6 +230,11 @@ class _GuestOrderingShellState extends State<GuestOrderingShell> {
               hideDrawer: true,
               mobileBottomNavigation: true,
               onBack: _handleExitPrompt,
+              leading: IconButton(
+                tooltip: 'Exit Walk-In Ordering',
+                onPressed: _handleExitPrompt,
+                icon: const Icon(Icons.arrow_back_rounded, color: Colors.black),
+              ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -244,27 +249,27 @@ class _GuestOrderingShellState extends State<GuestOrderingShell> {
                         ),
                       );
                     },
-                    icon: const Icon(Icons.search_rounded, color: Colors.white),
+                    icon: const Icon(Icons.search_rounded, color: Colors.black),
                   ),
                   if (_activeOrder != null)
                     IconButton(
                       tooltip: 'View active order and countdown',
                       onPressed: _showOrderModal,
-                      icon: const Badge(child: Icon(Icons.receipt_long_rounded, color: Colors.white)),
+                      icon: const Badge(child: Icon(Icons.receipt_long_rounded, color: Colors.black)),
                     ),
                   const SizedBox(width: 4),
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white70, width: 1.1),
+                      foregroundColor: Colors.black,
+                      side: const BorderSide(color: AppColors.darkBrown, width: 1.1),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                     onPressed: _handleExitPrompt,
-                    icon: const Icon(Icons.exit_to_app_rounded, size: 15, color: Colors.white),
-                    label: const Text('Exit', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                    icon: const Icon(Icons.exit_to_app_rounded, size: 15, color: Colors.black),
+                    label: const Text('Exit', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black)),
                   ),
                 ],
               ),
