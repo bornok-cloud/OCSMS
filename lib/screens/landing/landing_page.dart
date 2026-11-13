@@ -243,7 +243,7 @@ class _Section extends StatelessWidget {
 }
 
 // ===========================================================================
-// HEADER — sticky, white, logo + anchor links
+// HEADER — sticky, dark/black, logo + anchor links
 // ===========================================================================
 class _Header extends StatelessWidget {
   final bool scrolled;
@@ -265,10 +265,10 @@ class _Header extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: scrolled ? _kLine : Colors.transparent, width: 1)),
+        color: _kInk,
+        border: Border(bottom: BorderSide(color: scrolled ? Colors.white.withValues(alpha: 0.1) : Colors.transparent, width: 1)),
         boxShadow: scrolled
-            ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 16, offset: const Offset(0, 4))]
+            ? [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 16, offset: const Offset(0, 4))]
             : const [],
       ),
       child: SafeArea(
@@ -302,12 +302,12 @@ class _Brand extends StatelessWidget {
   final bool compact;
   const _Brand({required this.onTap, required this.compact});
 
-  static const String _asset = 'assets/images/OC_NAVBAR_LOGO.png';
+  static const String _asset = 'assets/images/logo_white_cropped.png';
   static const double _aspect = 6250 / 1563;
 
   @override
   Widget build(BuildContext context) {
-    final h = compact ? 44.0 : 60.0;
+    final h = compact ? 36.0 : 48.0;
     return Semantics(
       button: true,
       label: 'Overnight Cafe — back to top',
@@ -344,7 +344,7 @@ class _NavLink extends StatelessWidget {
     return TextButton(
       onPressed: onTap,
       style: TextButton.styleFrom(
-        foregroundColor: _kInk,
+        foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         shape: const StadiumBorder(),
         textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
