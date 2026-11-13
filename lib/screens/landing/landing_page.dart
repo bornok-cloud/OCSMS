@@ -92,39 +92,31 @@ class _LandingPageState extends State<LandingPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          // Sticky header: lives outside the scroll view so it is always reachable.
-          _Header(
-            scrolled: _scrolled,
-            onLogo: _scrollToTop,
-            onAbout: () => _scrollTo(_aboutKey),
-            onMenu: () => _scrollTo(_menuKey),
-            onContact: () => _scrollTo(_contactKey),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              controller: _scrollController,
-              child: Column(
-                children: [
-                  _Hero(onViewMenu: () => _scrollTo(_menuKey)),
-                  Container(key: _aboutKey, child: const _AboutSection()),
-                  // Rebuilds live when products stream in from Firestore.
-                  Container(
-                    key: _menuKey,
-                    child: ListenableBuilder(
-                      listenable: AppData.instance,
-                      builder: (context, _) => _MenuSection(products: List<Product>.of(AppData.instance.products)),
-                    ),
-                  ),
-                  _FinalCta(onLogin: () => _goToLogin(context)),
-                  Container(key: _contactKey, child: const _ContactFooter()),
-                ],
+      backgroundColor: _kInk,
+      body: SingleChildScrollView(
+        controller: _scrollController,
+        child: Column(
+          children: [
+            _Hero(
+              onViewMenu: () => _scrollTo(_menuKey),
+              onLogo: _scrollToTop,
+              onAbout: () => _scrollTo(_aboutKey),
+              onMenu: () => _scrollTo(_menuKey),
+              onContact: () => _scrollTo(_contactKey),
+            ),
+            Container(key: _aboutKey, child: const _AboutSection()),
+            // Rebuilds live when products stream in from Firestore.
+            Container(
+              key: _menuKey,
+              child: ListenableBuilder(
+                listenable: AppData.instance,
+                builder: (context, _) => _MenuSection(products: List<Product>.of(AppData.instance.products)),
               ),
             ),
-          ),
-        ],
+            _FinalCta(onLogin: () => _goToLogin(context)),
+            Container(key: _contactKey, child: const _ContactFooter()),
+          ],
+        ),
       ),
     );
   }
@@ -242,61 +234,6 @@ class _Section extends StatelessWidget {
   }
 }
 
-// ===========================================================================
-// HEADER — sticky, dark/black, logo + anchor links
-// ===========================================================================
-class _Header extends StatelessWidget {
-  final bool scrolled;
-  final VoidCallback onLogo, onAbout, onMenu, onContact;
-  const _Header({
-    required this.scrolled,
-    required this.onLogo,
-    required this.onAbout,
-    required this.onMenu,
-    required this.onContact,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final showLinks = width >= _kNavBreakpoint;
-    final mobile = width < _kMobileBreakpoint;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      decoration: BoxDecoration(
-        color: _kInk,
-        border: Border(bottom: BorderSide(color: scrolled ? Colors.white.withValues(alpha: 0.1) : Colors.transparent, width: 1)),
-        boxShadow: scrolled
-            ? [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 16, offset: const Offset(0, 4))]
-            : const [],
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: _pagePad(width), vertical: mobile ? 10 : 14),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: _kMaxContentWidth),
-              child: Row(
-                children: [
-                  _Brand(onTap: onLogo, compact: mobile),
-                  const Spacer(),
-                  if (showLinks) ...[
-                    _NavLink('About', onAbout),
-                    _NavLink('Menu', onMenu),
-                    _NavLink('Contact', onContact),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _Brand extends StatelessWidget {
   final VoidCallback onTap;
   final bool compact;
@@ -359,7 +296,18 @@ class _NavLink extends StatelessWidget {
 // ===========================================================================
 class _Hero extends StatelessWidget {
   final VoidCallback onViewMenu;
-  const _Hero({required this.onViewMenu});
+  final VoidCallback onLogo;
+  final VoidCallback onAbout;
+  final VoidCallback onMenu;
+  final VoidCallback onContact;
+
+  const _Hero({
+    required this.onViewMenu,
+    required this.onLogo,
+    required this.onAbout,
+    required this.onMenu,
+    required this.onContact,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -367,8 +315,21 @@ class _Hero extends StatelessWidget {
     final twoCol = w >= _kTwoColumnBreakpoint;
     final mobile = w < _kMobileBreakpoint;
     final narrow = w < 440;
+    final showLinks = w >= _kNavBreakpoint;
 
     final headlineSize = twoCol ? 68.0 : (mobile ? 42.0 : 56.0);
+
+    final headerRow = Row(
+      children: [
+        _Brand(onTap: onLogo, compact: mobile),
+        const Spacer(),
+        if (showLinks) ...[
+          _NavLink('About', onAbout),
+          _NavLink('Menu', onMenu),
+          _NavLink('Contact', onContact),
+        ],
+      ],
+    );
 
     final copy = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -416,27 +377,34 @@ class _Hero extends StatelessWidget {
           const Positioned.fill(child: ClipRect(child: CustomPaint(painter: _NightBackdropPainter()))),
           _Section(
             color: Colors.transparent,
-            topDesktop: 96,
+            topDesktop: 48,
             bottomDesktop: 112,
-            topMobile: 48,
+            topMobile: 24,
             bottomMobile: 56,
-            child: twoCol
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(flex: 6, child: copy),
-                      const SizedBox(width: 64),
-                      const Expanded(flex: 4, child: _TonightCard()),
-                    ],
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      copy,
-                      SizedBox(height: mobile ? 40 : 56),
-                      const _TonightCard(),
-                    ],
-                  ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                headerRow,
+                SizedBox(height: mobile ? 36 : 56),
+                twoCol
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(flex: 6, child: copy),
+                          const SizedBox(width: 64),
+                          const Expanded(flex: 4, child: _TonightCard()),
+                        ],
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          copy,
+                          SizedBox(height: mobile ? 40 : 56),
+                          const _TonightCard(),
+                        ],
+                      ),
+              ],
+            ),
           ),
         ],
       ),
