@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../services/app_data.dart';
@@ -43,24 +42,44 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   Future<void> _initializeApp() async {
-    final minSplashTime = Future.delayed(const Duration(milliseconds: 2200));
+    final minSplashTime = Future.delayed(const Duration(milliseconds: 1500));
+
+    // Check if opened via Walk-In QR Code URL FIRST (before session restore)
+    final uri = Uri.base;
+    final uriString = uri.toString().toLowerCase();
+    String fullQueryString = uriString;
+    if (uri.hasFragment) {
+      fullQueryString += '?' + uri.fragment.toLowerCase();
+    }
+
+    if (fullQueryString.contains('walk-in') || fullQueryString.contains('guest') || fullQueryString.contains('table')) {
+      await minSplashTime;
+      if (!mounted) return;
+
+      String? tableNum;
+      try {
+        if (uri.hasFragment) {
+          final fragUri = Uri.parse('http://localhost/${uri.fragment}');
+          tableNum = fragUri.queryParameters['table'];
+        }
+        tableNum ??= uri.queryParameters['table'];
+      } catch (_) {}
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => GuestOrderingShell(
+            initialTableNumber: tableNum != null && tableNum.isNotEmpty ? 'Table $tableNum' : 'Table 1',
+          ),
+        ),
+      );
+      return;
+    }
 
     // Restore persistent login session across restarts / background kills
     await AppData.instance.restoreSession();
     await minSplashTime;
 
     if (!mounted) return;
-
-    // Check if opened via Walk-In QR Code URL on web
-    if (kIsWeb) {
-      final uriString = Uri.base.toString().toLowerCase();
-      if (uriString.contains('walk-in') || uriString.contains('guest')) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const GuestOrderingShell()),
-        );
-        return;
-      }
-    }
 
     final user = AppData.instance.currentUser;
     Widget target = const LandingPage();
