@@ -1108,8 +1108,11 @@ class _MessagingScreenState extends State<MessagingScreen> {
         final chat = Column(
           children: [
             Container(
-              color: AppColors.beige,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: const BoxDecoration(
+                color: AppColors.beige,
+                border: Border(bottom: BorderSide(color: AppColors.border, width: 0.8)),
+              ),
               child: Row(
                 children: [
                   if (!wide) ...[
@@ -1390,7 +1393,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
           content = Row(
             children: [
               list,
-              const VerticalDivider(width: 1),
+              Container(width: 1, color: AppColors.border.withValues(alpha: 0.6)),
               Expanded(child: chat),
             ],
           );
@@ -1399,13 +1402,13 @@ class _MessagingScreenState extends State<MessagingScreen> {
         }
 
         return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          padding: const EdgeInsets.all(16),
           child: Container(
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: AppColors.cardWhite,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: AppColors.border, width: 1.2),
               boxShadow: AppShadows.soft,
             ),
             child: content,
