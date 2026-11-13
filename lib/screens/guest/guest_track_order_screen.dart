@@ -283,11 +283,6 @@ class _GuestTrackOrderScreenState extends State<GuestTrackOrderScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.cream,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        title: const Text('Track Walk-In Order', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
-      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
