@@ -3496,6 +3496,19 @@ class AppData extends ChangeNotifier {
     try {
       await FirebaseFirestore.instance.collection('attendance').doc(recordId).delete();
 
+      // Clear any pending/stale rfidScans for this employee so RFID state resets instantly
+      try {
+        final scansQuery = await FirebaseFirestore.instance
+            .collection('rfidScans')
+            .where('employeeName', isEqualTo: record.employeeName)
+            .get();
+        for (final doc in scansQuery.docs) {
+          await doc.reference.delete();
+        }
+      } catch (e) {
+        debugPrint('Error clearing rfidScans on reset: $e');
+      }
+
       final empIdx = employees.indexWhere(
           (e) => e.name.toLowerCase() == record.employeeName.toLowerCase());
       if (empIdx != -1) {

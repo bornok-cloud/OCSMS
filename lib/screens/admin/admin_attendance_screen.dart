@@ -103,9 +103,9 @@ class _AdminAttendanceScreenState extends State<AdminAttendanceScreen> {
                       final confirmed = await showDialog<bool>(
                         context: context,
                         builder: (ctx) => AlertDialog(
-                          title: const Text('Reset Attendance?'),
+                          title: const Text('Reset RFID Attendance?'),
                           content: Text(
-                              'Are you sure you want to delete attendance for ${a.employeeName} on $dateStr? This will also update their days worked.'),
+                              'Are you sure you want to reset RFID attendance for ${a.employeeName} on $dateStr? This will clear their Time In / Time Out status in Firebase and allow them to start a new attendance cycle using their RFID card.'),
                           actions: [
                             TextButton(
                                 onPressed: () => Navigator.pop(ctx, false),
