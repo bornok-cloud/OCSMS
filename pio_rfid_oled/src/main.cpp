@@ -15,6 +15,7 @@
 // ===========================================================================
 // OVERNIGHT CAFE — ESP32 RFID ATTENDANCE & FIREBASE INTEGRATION
 // Firebase Project: appdev-8edd2
+// Single Unified Collection: 'attendance'
 // ===========================================================================
 
 // ---- WiFi Configuration ----
@@ -398,10 +399,44 @@ EmployeeMatch findEmployeeByRfid(const String& uid) {
   return match;
 }
 
-// ---- Firebase Firestore Push: Log RFID Scan Event ----
-bool postRfidScanToFirebase(const String& uid, const String& employeeName = "",
-                            const String& action = "", const String& status = "",
-                            const String& email = "") {
+// ---- Check Open Attendance Document ID in 'attendance' Collection ----
+AttendanceStatus getEmployeeAttendanceStatus(const String& employeeName) {
+  AttendanceStatus status;
+  if (employeeName.length() == 0) return status;
+
+  QueryResult q = firestoreQuery("attendance", "employeeName", employeeName);
+  if (!q.ok) return status;
+
+  JsonDocument resDoc;
+  DeserializationError err = deserializeJson(resDoc, q.body);
+  if (err) return status;
+
+  status.queryOk = true;
+
+  if (resDoc.is<JsonArray>() && resDoc.size() > 0) {
+    for (JsonObject res : resDoc.as<JsonArray>()) {
+      if (!res["document"].isNull()) {
+        JsonObject fields = res["document"]["fields"];
+        if (!fields["timeIn"].isNull() && fields["timeOut"].isNull()) {
+          status.hasOpenShift = true;
+          String docPath = res["document"]["name"].as<String>();
+          int lastSlash = docPath.lastIndexOf('/');
+          if (lastSlash != -1) {
+            status.attendanceDocId = docPath.substring(lastSlash + 1);
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  return status;
+}
+
+// ---- Unified Direct Firestore Write to 'attendance' Collection ----
+bool postAttendanceToFirebase(const String& uid, const String& employeeName,
+                              const String& action, const String& status,
+                              const String& email) {
   if (WiFi.status() != WL_CONNECTED) return false;
 
   WiFiClientSecure client;
@@ -410,54 +445,62 @@ bool postRfidScanToFirebase(const String& uid, const String& employeeName = "",
   HTTPClient http;
   http.setTimeout(4000);
   http.setConnectTimeout(4000);
-  String postUrl = "https://firestore.googleapis.com/v1/projects/" + String(FIREBASE_PROJECT_ID) + "/databases/(default)/documents/rfidScans";
 
-  if (!http.begin(client, postUrl)) {
-    Serial.println("Firestore push: http.begin() failed");
-    return false;
+  struct tm ti;
+  getLocalTime(&ti, 0);
+  String timeStr = getCurrentTimeString();
+
+  // If action is TIME_OUT, check if an open document exists to update it
+  if (action == "TIME_OUT") {
+    AttendanceStatus attStatus = getEmployeeAttendanceStatus(employeeName);
+    if (attStatus.hasOpenShift && attStatus.attendanceDocId.length() > 0) {
+      String patchUrl = "https://firestore.googleapis.com/v1/projects/" + String(FIREBASE_PROJECT_ID) + "/databases/(default)/documents/attendance/" + attStatus.attendanceDocId + "?updateMask.fieldPaths=timeOut";
+      if (!http.begin(client, patchUrl)) return false;
+      http.addHeader("Content-Type", "application/json");
+
+      JsonDocument doc;
+      JsonObject fields = doc["fields"].to<JsonObject>();
+      fields["timeOut"]["stringValue"] = timeStr;
+
+      String requestBody;
+      serializeJson(doc, requestBody);
+      int httpCode = http.PATCH(requestBody);
+      http.end();
+      Serial.printf("Firestore attendance PATCH TIME_OUT HTTP %d\n", httpCode);
+      return (httpCode == 200 || httpCode == 201);
+    }
   }
+
+  // Action is TIME_IN -> Create new single document in 'attendance' collection
+  String postUrl = "https://firestore.googleapis.com/v1/projects/" + String(FIREBASE_PROJECT_ID) + "/databases/(default)/documents/attendance";
+  if (!http.begin(client, postUrl)) return false;
   http.addHeader("Content-Type", "application/json");
 
   JsonDocument doc;
   JsonObject fields = doc["fields"].to<JsonObject>();
-  fields["rfidTag"]["stringValue"] = uid;
-  if (employeeName.length() > 0) {
-    fields["employeeName"]["stringValue"] = employeeName;
-  }
-  if (email.length() > 0) {
-    fields["email"]["stringValue"] = email;
-  }
-  if (action.length() > 0) {
-    fields["action"]["stringValue"] = action;
-  }
-  if (status.length() > 0) {
-    fields["status"]["stringValue"] = status;
-  }
-  struct tm ti;
-  if (action.length() > 0 && getLocalTime(&ti, 0)) {
-    char tbuf[24];
-    snprintf(tbuf, sizeof(tbuf), "%04d-%02d-%02d %02d:%02d:%02d",
-             ti.tm_year + 1900, ti.tm_mon + 1, ti.tm_mday, ti.tm_hour, ti.tm_min, ti.tm_sec);
-    fields["scanTime"]["stringValue"] = String(tbuf);
-  }
+  fields["employeeName"]["stringValue"] = employeeName;
+  fields["timeIn"]["stringValue"] = timeStr;
+  fields["timeOut"]["nullValue"] = nullptr;
+  fields["status"]["stringValue"] = status.length() > 0 ? status : "Present";
+  fields["method"]["stringValue"] = "RFID";
+  fields["rfidCardId"]["stringValue"] = uid;
+
+  char isoBuf[30];
+  snprintf(isoBuf, sizeof(isoBuf), "%04d-%02d-%02dT%02d:%02d:%02d.000Z",
+           ti.tm_year + 1900, ti.tm_mon + 1, ti.tm_mday, ti.tm_hour, ti.tm_min, ti.tm_sec);
+  fields["date"]["timestampValue"] = String(isoBuf);
+  fields["createdAt"]["timestampValue"] = String(isoBuf);
 
   String requestBody;
   serializeJson(doc, requestBody);
-
   int httpCode = http.POST(requestBody);
   http.end();
 
-  Serial.printf("Firestore rfidScans push HTTP %d\n", httpCode);
+  Serial.printf("Firestore attendance POST TIME_IN HTTP %d\n", httpCode);
   return (httpCode == 200 || httpCode == 201);
 }
 
 // ---- Handle Scanned RFID Card Event ----
-// Schedule (Asia/Manila), shift runs 6:30 PM -> 2:30 AM:
-//   Time In : opens 6:30 PM. 6:30-6:40 PM = Present, 6:41 PM onwards = Late.
-//   Time Out: only 2:00 AM - 2:30 AM. Before 2:00 AM -> "Time Out Opens at 2:00 AM",
-//             after 2:30 AM -> "Time Out Closed".
-//   After Time In  -> next valid action is Time Out (in its window only).
-//   After Time Out -> next valid action is Time In from 6:30 PM.
 void processCardScan(const String& uid) {
   showScreen("Checking Card...", uid);
   Serial.println("Processing Card UID: " + uid);
@@ -477,7 +520,6 @@ void processCardScan(const String& uid) {
   }
 
   if (!emp.found) {
-    postRfidScanToFirebase(uid, "");
     Serial.println("UNREGISTERED CARD.");
     showError("Unregistered Card", "Not Linked", "UID: " + uid);
     return;
@@ -537,14 +579,14 @@ void processCardScan(const String& uid) {
     status = (minutes <= PRESENT_UNTIL_MIN) ? "Present" : "Late";
   }
 
-  // 4. Push Scan to Firebase for real-time app sync & attendance logging
+  // 4. Directly post to unified 'attendance' collection in Firestore
   String actionCode = doTimeOut ? "TIME_OUT" : "TIME_IN";
-  if (!postRfidScanToFirebase(uid, emp.fullName, actionCode, status, emp.email)) {
+  if (!postAttendanceToFirebase(uid, emp.fullName, actionCode, status, emp.email)) {
     showError(emp.fullName, "NOT SAVED", "Tap again");
     return;
   }
 
-  // 5. Commit the new state only after the scan was saved
+  // 5. Commit state only after saving
   if (!saveShiftRecord(uid, !doTimeOut, shiftDate, emp.email)) {
     Serial.println("WARNING: could not save local attendance state to flash.");
   }

@@ -20,8 +20,6 @@ class _RfidSettingsScreenState extends State<RfidSettingsScreen> {
   @override
   void initState() {
     super.initState();
-    // Ensure background RFID listener remains active for real-time scans
-    AppData.instance.listenToRfidScans();
   }
 
   @override
