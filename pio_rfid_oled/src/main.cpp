@@ -198,6 +198,58 @@ EmployeeMatch findEmployeeByRfid(const String& uid) {
   return match;
 }
 
+// ---- Check if Employee Already Tapped Today ----
+bool hasAlreadyTappedToday(const String& employeeName) {
+  if (WiFi.status() != WL_CONNECTED || employeeName.length() == 0) return false;
+
+  WiFiClientSecure client;
+  client.setInsecure();
+
+  HTTPClient http;
+  String queryUrl = "https://firestore.googleapis.com/v1/projects/" + String(FIREBASE_PROJECT_ID) + "/databases/(default)/documents:runQuery";
+
+  http.begin(client, queryUrl);
+  http.addHeader("Content-Type", "application/json");
+
+  JsonDocument doc;
+  JsonObject structuredQuery = doc["structuredQuery"].to<JsonObject>();
+
+  JsonArray from = structuredQuery["from"].to<JsonArray>();
+  JsonObject collection = from.add<JsonObject>();
+  collection["collectionId"] = "attendance";
+
+  JsonObject whereObj = structuredQuery["where"].to<JsonObject>();
+  JsonObject fieldFilter = whereObj["fieldFilter"].to<JsonObject>();
+  fieldFilter["field"]["fieldPath"] = "employeeName";
+  fieldFilter["op"] = "EQUAL";
+  fieldFilter["value"]["stringValue"] = employeeName;
+
+  String requestBody;
+  serializeJson(doc, requestBody);
+
+  int httpCode = http.POST(requestBody);
+  String responseBody = http.getString();
+  http.end();
+
+  if (httpCode == 200 && responseBody.length() > 0) {
+    JsonDocument resDoc;
+    DeserializationError err = deserializeJson(resDoc, responseBody);
+    if (!err && resDoc.is<JsonArray>() && resDoc.size() > 0) {
+      for (JsonObject res : resDoc.as<JsonArray>()) {
+        if (!res["document"].isNull()) {
+          JsonObject fields = res["document"]["fields"];
+          // Check if attendance record exists for today (has timeIn)
+          if (!fields["timeIn"].isNull()) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
 // ---- Firebase Firestore Push: Log RFID Scan Event ----
 bool postRfidScanToFirebase(const String& uid, const String& employeeName = "") {
   if (WiFi.status() != WL_CONNECTED) return false;
@@ -236,19 +288,29 @@ void processCardScan(const String& uid) {
   // 1. Query Firestore for Employee matching rfidCardId
   EmployeeMatch emp = findEmployeeByRfid(uid);
 
-  // 2. Push Scan to Firebase for real-time app sync & attendance logging
-  postRfidScanToFirebase(uid, emp.fullName);
-
-  // 3. Display Result on OLED & Play Sound
-  if (emp.found) {
-    Serial.printf("MATCH FOUND! Employee: %s | Email: %s\n", emp.fullName.c_str(), emp.email.c_str());
-    showScreen(emp.fullName, "ATTENDANCE", emp.email.length() > 0 ? emp.email : uid);
-    beepOk();
-  } else {
-    Serial.println("UNREGISTERED CARD. Card UID posted to rfidScans for admin linking.");
+  if (!emp.found) {
+    postRfidScanToFirebase(uid, "");
+    Serial.println("UNREGISTERED CARD.");
     showScreen("Unregistered Card", "Not Linked", "UID: " + uid);
     beepFail();
+    return;
   }
+
+  // 2. Check if already tapped today
+  if (hasAlreadyTappedToday(emp.fullName)) {
+    Serial.println("ALREADY TAPPED TODAY: " + emp.fullName);
+    showScreen(emp.fullName, "ALREADY TAPPED", "Already recorded");
+    beepFail();
+    return;
+  }
+
+  // 3. Push Scan to Firebase for real-time app sync & attendance logging
+  postRfidScanToFirebase(uid, emp.fullName);
+
+  // 4. Display Success Result on OLED & Play Sound
+  Serial.printf("ATTENDANCE SUCCESS! Employee: %s\n", emp.fullName.c_str());
+  showScreen(emp.fullName, "ATTENDANCE", emp.email.length() > 0 ? emp.email : uid);
+  beepOk();
 }
 
 // ---- Setup: Automatic Initialization on Power Up ----
@@ -298,11 +360,11 @@ void loop() {
     rfid.PICC_HaltA();
 
     // Short display pause
-    delay(1200);
+    delay(1500);
 
     // Debounce: Wait until card is lifted/removed from reader
     unsigned long removeStart = millis();
-    while (rfid.PICC_IsNewCardPresent() && millis() - removeStart < 1500) {
+    while (rfid.PICC_IsNewCardPresent() && millis() - removeStart < 2000) {
       rfid.PICC_HaltA();
       delay(50);
     }
