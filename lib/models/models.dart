@@ -23,6 +23,7 @@ class AppUser {
   bool loyalToggle;
   List<String> hiddenConversations;
   Map<String, DateTime> clearedConversations;
+  String? rfidCardId;
 
   AppUser({
     required this.id,
@@ -44,6 +45,7 @@ class AppUser {
     this.loyalToggle = true,
     this.hiddenConversations = const [],
     this.clearedConversations = const {},
+    this.rfidCardId,
   });
 
   String get roleLabel {

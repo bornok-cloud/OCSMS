@@ -352,6 +352,7 @@ class AppData extends ChangeNotifier {
                 });
                 return parsed;
               })(),
+              rfidCardId: data['rfidCardId'] as String?,
             );
           } catch (e) {
             debugPrint('Error loading user doc ${doc.id}: $e');
@@ -4219,6 +4220,22 @@ class AppData extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  Future<void> updateEmployeeRfidCard(String userId, String rfidCardId) async {
+    try {
+      final trimmedTag = rfidCardId.trim();
+      await FirebaseFirestore.instance.collection('users').doc(userId).update({
+        'rfidCardId': trimmedTag,
+      });
+      final idx = users.indexWhere((u) => u.id == userId);
+      if (idx != -1) {
+        users[idx].rfidCardId = trimmedTag;
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error updating RFID Card ID: $e');
+    }
   }
 
   Future<void> updateUserStatus(String userId, String newStatus) async {

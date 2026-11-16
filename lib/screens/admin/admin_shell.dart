@@ -19,6 +19,7 @@ import 'admin_order_history_screen.dart';
 import 'gcash_settings_screen.dart';
 import 'printer_settings_screen.dart';
 import 'qr_generator_screen.dart';
+import 'rfid_settings_screen.dart';
 import '../employee/kiosk_management_screen.dart';
 
 class AdminShell extends StatelessWidget {
@@ -43,6 +44,7 @@ class AdminShell extends StatelessWidget {
         NavItem(icon: Icons.qr_code_2_outlined, label: 'GCash Settings', builder: () => const GcashSettingsScreen()),
         NavItem(icon: Icons.print_outlined, label: 'Printer Settings', builder: () => const PrinterSettingsScreen()),
         NavItem(icon: Icons.qr_code_scanner_outlined, label: 'Walk-In QR Code', builder: () => const QrGeneratorScreen()),
+        NavItem(icon: Icons.nfc_outlined, label: 'RFID Settings', builder: () => const RfidSettingsScreen()),
         NavItem(icon: Icons.people_outline, label: 'User Management', builder: () => const UserManagementScreen()),
         NavItem(icon: Icons.archive_outlined, label: 'Archive', builder: () => const ArchiveScreen()),
       ],
