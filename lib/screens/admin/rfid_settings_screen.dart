@@ -18,6 +18,13 @@ class _RfidSettingsScreenState extends State<RfidSettingsScreen> {
   final _testTagCtrl = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // Ensure background RFID listener remains active for real-time scans
+    AppData.instance.listenToRfidScans();
+  }
+
+  @override
   void dispose() {
     _testTagCtrl.dispose();
     super.dispose();
