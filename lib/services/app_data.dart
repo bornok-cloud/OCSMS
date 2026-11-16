@@ -594,6 +594,54 @@ class AppData extends ChangeNotifier {
       // employee forgot to scan out), then keep sweeping so it self-heals
       // even while nobody has the app open scanning.
       _startAttendanceSweep();
+      listenToRfidScans();
+    }
+  }
+
+  bool _rfidScansListenerSet = false;
+
+  /// Real-time Firestore listener for external RFID Hardware (ESP32, Arduino, Android Studio RFID App)
+  /// Whenever a new scan document is added to 'rfidScans' collection in Firebase, it automatically
+  /// matches the employee and records Time In / Time Out.
+  void listenToRfidScans() {
+    if (_rfidScansListenerSet) return;
+    _rfidScansListenerSet = true;
+    FirebaseFirestore.instance.collection('rfidScans').snapshots().listen((snapshot) {
+      for (final change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.added) {
+          final data = change.doc.data();
+          final rfidTag = (data?['rfidTag'] as String? ?? data?['cardId'] as String? ?? '').trim();
+          final empName = data?['employeeName'] as String?;
+          if (rfidTag.isNotEmpty || (empName != null && empName.isNotEmpty)) {
+            _processRfidScan(rfidTag: rfidTag, employeeName: empName);
+          }
+        }
+      }
+    });
+  }
+
+  Future<void> _processRfidScan({required String rfidTag, String? employeeName}) async {
+    String? matchedName = employeeName;
+    if (matchedName == null || matchedName.isEmpty) {
+      for (final emp in employees) {
+        if (emp.name.toLowerCase() == rfidTag.toLowerCase() ||
+            emp.id.toLowerCase() == rfidTag.toLowerCase()) {
+          matchedName = emp.name;
+          break;
+        }
+      }
+      if (matchedName == null || matchedName.isEmpty) {
+        for (final user in users) {
+          if (user.fullName.toLowerCase() == rfidTag.toLowerCase() ||
+              user.id.toLowerCase() == rfidTag.toLowerCase()) {
+            matchedName = user.fullName;
+            break;
+          }
+        }
+      }
+    }
+    if (matchedName != null && matchedName.isNotEmpty) {
+      await recordAttendance(matchedName, method: 'RFID');
     }
   }
 
