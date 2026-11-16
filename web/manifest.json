@@ -1,0 +1,35 @@
+{
+    "name": "Overnight Cafe",
+    "short_name": "Overnight Cafe",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#2C221E",
+    "theme_color": "#2C221E",
+    "description": "Sip, Savour & Stay Overnight. Order online or walk-in at Overnight Cafe.",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

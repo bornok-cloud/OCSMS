@@ -1,0 +1,6 @@
+- `[x]` Update `OrderRecord` and `TransactionRecord` models to support guest orders (`isGuest`, `tableNumber`)
+- `[x]` Create Guest Ordering Shell and Interface (`guest_ordering_shell.dart`, reusing kiosk and cart logic)
+- `[x]` Create Guest Order Tracking screen/dialog (`guest_track_order_screen.dart`)
+- `[x]` Create Table QR Code Generator screen for admin/staff (`qr_generator_screen.dart`)
+- `[x]` Integrate guest orders into Employee Kitchen and Admin Order History with distinct **[Guest]** badges
+- `[x]` Verify build, analysis, and end-to-end guest ordering workflows
