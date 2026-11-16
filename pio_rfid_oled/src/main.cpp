@@ -66,31 +66,33 @@ byte lastVersionReg = 0;      // last VersionReg value read (0x00/0xFF = no answ
 
 // ---- Employee Record & Attendance Structures ----
 struct EmployeeMatch {
-  bool queryOk = false;   // false = network/server/parse error
-  int httpCode = 0;
-  bool found = false;
-  String fullName = "";
-  String email = "";
-  String id = "";
+    bool queryOk = false;   // false = network/server/parse error
+    int httpCode = 0;
+    bool found = false;
+    String fullName = "";
+    String email = "";
+    String id = "";
 };
 
 struct AttendanceStatus {
-  bool queryOk = false;
-  bool hasOpenShift = false;
-  String attendanceDocId = "";
+    bool queryOk = false;
+    bool hasOpenShift = false;        // timeIn set, timeOut empty
+    bool completedThisShift = false;  // timeIn + timeOut already recorded for the current shift
+    String attendanceDocId = "";
 };
 
 struct QueryResult {
-  bool ok = false;
-  int httpCode = 0;
-  String body = "";
+    bool ok = false;
+    int httpCode = 0;
+    String body = "";
 };
 
 // Per-employee shift record, keyed by RFID UID and tied to the registered email.
+// This is only a local mirror. Firebase is always the source of truth.
 struct ShiftRecord {
-  bool timedIn = false;     // true = open shift (Time In done, Time Out pending)
-  String shiftDate = "";    // empty = no record
-  String email = "";
+    bool timedIn = false;     // true = open shift (Time In done, Time Out pending)
+    String shiftDate = "";    // empty = no record
+    String email = "";
 };
 
 // ---- Passive Speaker/Buzzer Tones ----
@@ -209,6 +211,32 @@ String currentShiftDate(int minutesOfDay) {
   if (minutesOfDay < TIME_IN_OPEN_MIN) nowT -= 86400;
   struct tm t;
   localtime_r(&nowT, &t);
+  char buf[9];
+  snprintf(buf, sizeof(buf), "%04d%02d%02d", t.tm_year + 1900, t.tm_mon + 1, t.tm_mday);
+  return String(buf);
+}
+
+// Derive the shift date (YYYYMMDD) from a stored ISO timestamp such as
+// 2026-11-16T19:05:00.000Z (stored as Philippine local time).
+// Returns "" if it cannot be parsed.
+String shiftDateFromIso(const String& iso) {
+  if (iso.length() < 16) return "";
+  int y  = iso.substring(0, 4).toInt();
+  int mo = iso.substring(5, 7).toInt();
+  int d  = iso.substring(8, 10).toInt();
+  int h  = iso.substring(11, 13).toInt();
+  int mi = iso.substring(14, 16).toInt();
+  if (y < 2000 || mo < 1 || d < 1) return "";
+
+  struct tm t = {};
+  t.tm_year = y - 1900;
+  t.tm_mon = mo - 1;
+  t.tm_mday = d;
+  t.tm_hour = 12;              // noon avoids DST edge cases when normalizing
+  t.tm_isdst = -1;
+  if (h * 60 + mi < TIME_IN_OPEN_MIN) t.tm_mday -= 1;  // before 6:30 PM belongs to the previous shift
+  mktime(&t);                  // normalizes the date
+
   char buf[9];
   snprintf(buf, sizeof(buf), "%04d%02d%02d", t.tm_year + 1900, t.tm_mon + 1, t.tm_mday);
   return String(buf);
@@ -399,8 +427,9 @@ EmployeeMatch findEmployeeByRfid(const String& uid) {
   return match;
 }
 
-// ---- Check Open Attendance Document ID in 'attendance' Collection ----
-AttendanceStatus getEmployeeAttendanceStatus(const String& employeeName) {
+// ---- Check the employee's existing record(s) in the 'attendance' Collection ----
+// Runs on EVERY tap. Firebase is the source of truth, per employee name.
+AttendanceStatus getEmployeeAttendanceStatus(const String& employeeName, const String& currentShift) {
   AttendanceStatus status;
   if (employeeName.length() == 0) return status;
 
@@ -413,20 +442,34 @@ AttendanceStatus getEmployeeAttendanceStatus(const String& employeeName) {
 
   status.queryOk = true;
 
-  if (resDoc.is<JsonArray>() && resDoc.size() > 0) {
-    for (JsonObject res : resDoc.as<JsonArray>()) {
-      if (!res["document"].isNull()) {
-        JsonObject fields = res["document"]["fields"];
-        if (!fields["timeIn"].isNull() && fields["timeOut"].isNull()) {
-          status.hasOpenShift = true;
-          String docPath = res["document"]["name"].as<String>();
-          int lastSlash = docPath.lastIndexOf('/');
-          if (lastSlash != -1) {
-            status.attendanceDocId = docPath.substring(lastSlash + 1);
-          }
-          break;
-        }
-      }
+  if (!resDoc.is<JsonArray>()) return status;
+
+  for (JsonObject res : resDoc.as<JsonArray>()) {
+    if (res["document"].isNull()) continue;   // empty result entry (no match)
+
+    JsonObject fields = res["document"]["fields"];
+    // timeOut is written as {"nullValue": null} on Time In, so read the stringValue.
+    // A missing stringValue (nullValue) becomes "".
+    const char* tIn  = fields["timeIn"]["stringValue"] | "";
+    const char* tOut = fields["timeOut"]["stringValue"] | "";
+    String dateStr   = fields["date"]["timestampValue"] | "";
+
+    bool hasTimeIn  = strlen(tIn) > 0;
+    bool hasTimeOut = strlen(tOut) > 0;
+    if (!hasTimeIn) continue;                 // reset/blank record: ignore
+
+    if (!hasTimeOut) {
+      status.hasOpenShift = true;
+      String docPath = res["document"]["name"].as<String>();
+      int lastSlash = docPath.lastIndexOf('/');
+      if (lastSlash != -1) status.attendanceDocId = docPath.substring(lastSlash + 1);
+      break;                                  // open shift takes priority
+    }
+
+    // Completed record: only counts if it belongs to the current shift
+    String recShift = shiftDateFromIso(dateStr);
+    if (recShift.length() == 0 || recShift == currentShift) {
+      status.completedThisShift = true;
     }
   }
 
@@ -436,7 +479,7 @@ AttendanceStatus getEmployeeAttendanceStatus(const String& employeeName) {
 // ---- Unified Direct Firestore Write to 'attendance' Collection ----
 bool postAttendanceToFirebase(const String& uid, const String& employeeName,
                               const String& action, const String& status,
-                              const String& email) {
+                              const String& email, const String& openDocId = "") {
   if (WiFi.status() != WL_CONNECTED) return false;
 
   WiFiClientSecure client;
@@ -450,28 +493,27 @@ bool postAttendanceToFirebase(const String& uid, const String& employeeName,
   getLocalTime(&ti, 0);
   String timeStr = getCurrentTimeString();
 
-  // If action is TIME_OUT, check if an open document exists to update it
+  // TIME_OUT: update ONLY the existing open record. Never create a new one.
   if (action == "TIME_OUT") {
-    AttendanceStatus attStatus = getEmployeeAttendanceStatus(employeeName);
-    if (attStatus.hasOpenShift && attStatus.attendanceDocId.length() > 0) {
-      String patchUrl = "https://firestore.googleapis.com/v1/projects/" + String(FIREBASE_PROJECT_ID) + "/databases/(default)/documents/attendance/" + attStatus.attendanceDocId + "?updateMask.fieldPaths=timeOut";
-      if (!http.begin(client, patchUrl)) return false;
-      http.addHeader("Content-Type", "application/json");
+    if (openDocId.length() == 0) return false;
 
-      JsonDocument doc;
-      JsonObject fields = doc["fields"].to<JsonObject>();
-      fields["timeOut"]["stringValue"] = timeStr;
+    String patchUrl = "https://firestore.googleapis.com/v1/projects/" + String(FIREBASE_PROJECT_ID) + "/databases/(default)/documents/attendance/" + openDocId + "?updateMask.fieldPaths=timeOut";
+    if (!http.begin(client, patchUrl)) return false;
+    http.addHeader("Content-Type", "application/json");
 
-      String requestBody;
-      serializeJson(doc, requestBody);
-      int httpCode = http.PATCH(requestBody);
-      http.end();
-      Serial.printf("Firestore attendance PATCH TIME_OUT HTTP %d\n", httpCode);
-      return (httpCode == 200 || httpCode == 201);
-    }
+    JsonDocument doc;
+    JsonObject fields = doc["fields"].to<JsonObject>();
+    fields["timeOut"]["stringValue"] = timeStr;
+
+    String requestBody;
+    serializeJson(doc, requestBody);
+    int httpCode = http.PATCH(requestBody);
+    http.end();
+    Serial.printf("Firestore attendance PATCH TIME_OUT HTTP %d\n", httpCode);
+    return (httpCode == 200 || httpCode == 201);
   }
 
-  // Action is TIME_IN -> Create new single document in 'attendance' collection
+  // TIME_IN -> create a new single document in 'attendance' collection
   String postUrl = "https://firestore.googleapis.com/v1/projects/" + String(FIREBASE_PROJECT_ID) + "/databases/(default)/documents/attendance";
   if (!http.begin(client, postUrl)) return false;
   http.addHeader("Content-Type", "application/json");
@@ -500,6 +542,37 @@ bool postAttendanceToFirebase(const String& uid, const String& employeeName,
   return (httpCode == 200 || httpCode == 201);
 }
 
+// ---- Firebase Firestore Push: Log RFID Scan Event for Registration ----
+bool postRfidScanToFirebase(const String& uid, const String& employeeName = "") {
+  if (WiFi.status() != WL_CONNECTED) return false;
+
+  WiFiClientSecure client;
+  client.setInsecure();
+
+  HTTPClient http;
+  http.setTimeout(3000);
+  http.setConnectTimeout(3000);
+  String postUrl = "https://firestore.googleapis.com/v1/projects/" + String(FIREBASE_PROJECT_ID) + "/databases/(default)/documents/rfidScans";
+
+  if (!http.begin(client, postUrl)) return false;
+  http.addHeader("Content-Type", "application/json");
+
+  JsonDocument doc;
+  JsonObject fields = doc["fields"].to<JsonObject>();
+  fields["rfidTag"]["stringValue"] = uid;
+  if (employeeName.length() > 0) {
+    fields["employeeName"]["stringValue"] = employeeName;
+  }
+
+  String requestBody;
+  serializeJson(doc, requestBody);
+  int httpCode = http.POST(requestBody);
+  http.end();
+
+  Serial.printf("Firestore rfidScans push HTTP %d\n", httpCode);
+  return (httpCode == 200 || httpCode == 201);
+}
+
 // ---- Handle Scanned RFID Card Event ----
 void processCardScan(const String& uid) {
   showScreen("Checking Card...", uid);
@@ -520,7 +593,8 @@ void processCardScan(const String& uid) {
   }
 
   if (!emp.found) {
-    Serial.println("UNREGISTERED CARD.");
+    postRfidScanToFirebase(uid, "");
+    Serial.println("UNREGISTERED CARD. Tag posted for live registration.");
     showError("Unregistered Card", "Not Linked", "UID: " + uid);
     return;
   }
@@ -541,33 +615,36 @@ void processCardScan(const String& uid) {
 
   bool inTimeOutWindow = (minutes >= TIME_OUT_OPEN_MIN && minutes <= TIME_OUT_CLOSE_MIN);
   bool inTimeInWindow = (minutes >= TIME_IN_OPEN_MIN || minutes < TIME_OUT_OPEN_MIN);
-
-  // 3. Load live attendance status from Firestore to sync with Admin reset
-  AttendanceStatus attStatus = getEmployeeAttendanceStatus(emp.fullName);
   String shiftDate = currentShiftDate(minutes);
-  ShiftRecord rec = loadShiftRecord(uid);
 
-  // If card re-linked or Admin reset attendance in Firestore, clear local Flash state
-  if ((rec.shiftDate.length() > 0 && rec.email != emp.email) || (!attStatus.hasOpenShift && rec.timedIn)) {
-    Serial.println("Attendance reset or re-linked, clearing local state for " + emp.fullName);
-    rec = ShiftRecord();
-    saveShiftRecord(uid, false, "", emp.email);
+  // 3. Validate against the employee's existing record in Firebase on EVERY tap.
+  //    If the check fails we never fall through to a write.
+  AttendanceStatus attStatus = getEmployeeAttendanceStatus(emp.fullName, shiftDate);
+  if (!attStatus.queryOk) {
+    showError("Server Error", "Try Again", "Attendance check");
+    return;
   }
 
-  bool sameShift = (rec.shiftDate.length() > 0 && rec.shiftDate == shiftDate);
-  bool openShift = attStatus.hasOpenShift || (sameShift && rec.timedIn);
-  bool completedShift = (sameShift && !rec.timedIn && !attStatus.hasOpenShift);
+  // Keep the flash mirror in sync with Firebase. If the Admin reset this employee
+  // (record gone) or the card was re-linked, clear only THIS card's local state.
+  ShiftRecord rec = loadShiftRecord(uid);
+  bool firebaseHasRecord = attStatus.hasOpenShift || attStatus.completedThisShift;
+  if ((rec.shiftDate.length() > 0 && !firebaseHasRecord) ||
+      (rec.shiftDate.length() > 0 && rec.email != emp.email)) {
+    Serial.println("Attendance reset or re-linked, clearing local state for " + emp.fullName);
+    saveShiftRecord(uid, false, "", emp.email);
+  }
 
   bool doTimeOut = false;
   String status = "";
 
-  if (openShift) {
-    // Already timed in for this shift -> only Time Out is valid, and only in its window
+  if (attStatus.hasOpenShift) {
+    // Already timed in -> a new Time In is never allowed. Only Time Out, only in its window.
     if (inTimeOutWindow) {
       doTimeOut = true;
     } else if (minutes < TIME_OUT_OPEN_MIN || minutes >= TIME_IN_OPEN_MIN) {
-      Serial.println("TIME OUT BLOCKED: before 2:00 AM for " + emp.fullName);
-      showError(emp.fullName, "Time Out Opens at 2:00 AM", "");
+      Serial.println("DUPLICATE TIME IN BLOCKED (open record exists): " + emp.fullName);
+      showError(emp.fullName, "Time-out opens at 2:00am", "");
       return;
     } else {
       Serial.println("TIME OUT CLOSED: after 2:30 AM for " + emp.fullName);
@@ -575,8 +652,8 @@ void processCardScan(const String& uid) {
       return;
     }
   } else {
-    // No open shift -> only Time In is valid. Prevent multiple Time Ins for the same shift unless Admin resets attendance.
-    if (completedShift) {
+    // No open record. If this shift already has a completed record, block until Admin reset.
+    if (attStatus.completedThisShift) {
       Serial.println("TIME IN BLOCKED (ALREADY COMPLETED): " + emp.fullName);
       showError(emp.fullName, "Already Timed In", "Need Admin Reset");
       return;
@@ -589,19 +666,19 @@ void processCardScan(const String& uid) {
     status = (minutes <= PRESENT_UNTIL_MIN) ? "Present" : "Late";
   }
 
-  // 4. Directly post to unified 'attendance' collection in Firestore
+  // 4. Write to the unified 'attendance' collection in Firestore
   String actionCode = doTimeOut ? "TIME_OUT" : "TIME_IN";
-  if (!postAttendanceToFirebase(uid, emp.fullName, actionCode, status, emp.email)) {
+  if (!postAttendanceToFirebase(uid, emp.fullName, actionCode, status, emp.email, attStatus.attendanceDocId)) {
     showError(emp.fullName, "NOT SAVED", "Tap again");
     return;
   }
 
-  // 5. Commit state only after saving
+  // 5. Commit local mirror only after Firebase save succeeded
   if (!saveShiftRecord(uid, !doTimeOut, shiftDate, emp.email)) {
     Serial.println("WARNING: could not save local attendance state to flash.");
   }
 
-  // 6. Display Success Result on OLED & Play Sound
+  // 6. Display success result on OLED & play sound
   String actionLabel = doTimeOut ? "TIME OUT " + timeStr : "TIME IN " + timeStr;
   Serial.printf("ATTENDANCE SUCCESS! Employee: %s | Action: %s | Status: %s\n",
                 emp.fullName.c_str(), actionLabel.c_str(), status.c_str());
