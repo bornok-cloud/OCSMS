@@ -542,16 +542,21 @@ void processCardScan(const String& uid) {
   bool inTimeOutWindow = (minutes >= TIME_OUT_OPEN_MIN && minutes <= TIME_OUT_CLOSE_MIN);
   bool inTimeInWindow = (minutes >= TIME_IN_OPEN_MIN || minutes < TIME_OUT_OPEN_MIN);
 
-  // 3. Load this employee's state (keyed by RFID UID, tied to registered email)
+  // 3. Load live attendance status from Firestore to sync with Admin reset
+  AttendanceStatus attStatus = getEmployeeAttendanceStatus(emp.fullName);
   String shiftDate = currentShiftDate(minutes);
   ShiftRecord rec = loadShiftRecord(uid);
-  if (rec.shiftDate.length() > 0 && rec.email != emp.email) {
-    Serial.println("Card re-linked to a different email, resetting stored state.");
+
+  // If card re-linked or Admin reset attendance in Firestore, clear local Flash state
+  if ((rec.shiftDate.length() > 0 && rec.email != emp.email) || (!attStatus.hasOpenShift && rec.timedIn)) {
+    Serial.println("Attendance reset or re-linked, clearing local state for " + emp.fullName);
     rec = ShiftRecord();
+    saveShiftRecord(uid, false, "", emp.email);
   }
+
   bool sameShift = (rec.shiftDate.length() > 0 && rec.shiftDate == shiftDate);
-  bool openShift = (sameShift && rec.timedIn);
-  bool completedShift = (sameShift && !rec.timedIn);
+  bool openShift = attStatus.hasOpenShift || (sameShift && rec.timedIn);
+  bool completedShift = (sameShift && !rec.timedIn && !attStatus.hasOpenShift);
 
   bool doTimeOut = false;
   String status = "";
