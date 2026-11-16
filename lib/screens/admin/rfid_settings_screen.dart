@@ -342,8 +342,10 @@ class _RfidSettingsScreenState extends State<RfidSettingsScreen> {
       listenable: AppData.instance,
       builder: (context, _) {
         final staffList = AppData.instance.users
-            .where((u) => u.role != UserRole.customer && u.status == 'Active')
-            .where((u) => u.fullName.toLowerCase().contains(_searchQuery.toLowerCase()))
+            .where((u) => (u.role == UserRole.employee || u.role == UserRole.admin) && u.status == 'Active')
+            .where((u) =>
+                u.fullName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                u.email.toLowerCase().contains(_searchQuery.toLowerCase()))
             .toList();
 
         return SectionPage(

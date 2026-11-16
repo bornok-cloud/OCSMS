@@ -4243,9 +4243,23 @@ class AppData extends ChangeNotifier {
         'rfidCardId': trimmedTag,
       });
       final idx = users.indexWhere((u) => u.id == userId);
+      String userEmail = '';
       if (idx != -1) {
         users[idx].rfidCardId = trimmedTag;
+        userEmail = users[idx].email;
       }
+
+      // Also update employees collection document if linked
+      try {
+        final empDoc = await FirebaseFirestore.instance.collection('employees').doc(userId).get();
+        if (empDoc.exists) {
+          await FirebaseFirestore.instance.collection('employees').doc(userId).set({
+            'rfidCardId': trimmedTag,
+            'email': userEmail,
+          }, SetOptions(merge: true));
+        }
+      } catch (_) {}
+
       notifyListeners();
     } catch (e) {
       debugPrint('Error updating RFID Card ID: $e');
