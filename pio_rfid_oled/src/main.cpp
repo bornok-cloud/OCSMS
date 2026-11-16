@@ -8,6 +8,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <ArduinoJson.h>
+#include <time.h>
 
 // ===========================================================================
 // OVERNIGHT CAFE — ESP32 RFID ATTENDANCE & FIREBASE INTEGRATION
@@ -15,8 +16,8 @@
 // ===========================================================================
 
 // ---- WiFi Configuration ----
-const char* WIFI_SSID = "paul";
-const char* WIFI_PASSWORD = "12345678";
+const char* WIFI_SSID = "SALT";
+const char* WIFI_PASSWORD = "KONEK_kaditoSALT19";
 
 // ---- Firebase Configuration ----
 const char* FIREBASE_PROJECT_ID = "appdev-8edd2";
@@ -36,12 +37,17 @@ MFRC522 rfid(SS_PIN, RST_PIN);
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 bool oledOk = false;
 
-// ---- Employee Record Structure ----
+// ---- Employee Record & Attendance Structures ----
 struct EmployeeMatch {
   bool found = false;
   String fullName = "";
   String email = "";
   String id = "";
+};
+
+struct AttendanceStatus {
+  bool hasOpenShift = false;
+  String attendanceDocId = "";
 };
 
 // ---- Passive Speaker/Buzzer Tones ----
@@ -94,6 +100,43 @@ void showScreen(const String& l1, const String& l2 = "", const String& l3 = "") 
   display.display();
 }
 
+// ---- NTP Time Sync (Philippine Time UTC+8) ----
+void setupNtp() {
+  configTime(8 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+  Serial.print("Syncing NTP Time (Asia/Manila)");
+  unsigned long start = millis();
+  struct tm timeinfo;
+  while (!getLocalTime(&timeinfo) && millis() - start < 10000) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nNTP Synced!");
+}
+
+String getCurrentTimeString() {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    return "00:00 AM";
+  }
+  char buf[10];
+  int hour = timeinfo.tm_hour;
+  int minute = timeinfo.tm_min;
+  const char* period = (hour < 12) ? "AM" : "PM";
+  int hour12 = hour % 12;
+  if (hour12 == 0) hour12 = 12;
+  sprintf(buf, "%d:%02d %s", hour12, minute, period);
+  return String(buf);
+}
+
+bool isTimeoutWindow() {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    return false;
+  }
+  // 2:00 AM to 2:30 AM window for Time Out
+  return (timeinfo.tm_hour == 2 && timeinfo.tm_min >= 0 && timeinfo.tm_min <= 30);
+}
+
 // ---- WiFi Connection Handler ----
 void connectWifi() {
   WiFi.mode(WIFI_STA);
@@ -111,8 +154,9 @@ void connectWifi() {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.print("\nWiFi Connected! IP: ");
     Serial.println(WiFi.localIP());
-    showScreen("WiFi OK", WiFi.localIP().toString(), "Overnight Cafe");
-    delay(1000);
+    showScreen("WiFi OK", WiFi.localIP().toString(), "Syncing NTP...");
+    setupNtp();
+    delay(800);
   } else {
     Serial.println("\nWiFi connection failed. Retrying in background...");
     showScreen("WiFi FAILED", "OFFLINE", "Retrying...");
@@ -198,7 +242,66 @@ EmployeeMatch findEmployeeByRfid(const String& uid) {
   return match;
 }
 
-// ---- Check if Employee Already Tapped Today ----
+// ---- Check Employee Open Attendance Status ----
+AttendanceStatus getEmployeeAttendanceStatus(const String& employeeName) {
+  AttendanceStatus status;
+  if (WiFi.status() != WL_CONNECTED || employeeName.length() == 0) return status;
+
+  WiFiClientSecure client;
+  client.setInsecure();
+
+  HTTPClient http;
+  String queryUrl = "https://firestore.googleapis.com/v1/projects/" + String(FIREBASE_PROJECT_ID) + "/databases/(default)/documents:runQuery";
+
+  http.begin(client, queryUrl);
+  http.addHeader("Content-Type", "application/json");
+
+  JsonDocument doc;
+  JsonObject structuredQuery = doc["structuredQuery"].to<JsonObject>();
+
+  JsonArray from = structuredQuery["from"].to<JsonArray>();
+  JsonObject collection = from.add<JsonObject>();
+  collection["collectionId"] = "attendance";
+
+  JsonObject whereObj = structuredQuery["where"].to<JsonObject>();
+  JsonObject fieldFilter = whereObj["fieldFilter"].to<JsonObject>();
+  fieldFilter["field"]["fieldPath"] = "employeeName";
+  fieldFilter["op"] = "EQUAL";
+  fieldFilter["value"]["stringValue"] = employeeName;
+
+  String requestBody;
+  serializeJson(doc, requestBody);
+
+  int httpCode = http.POST(requestBody);
+  String responseBody = http.getString();
+  http.end();
+
+  if (httpCode == 200 && responseBody.length() > 0) {
+    JsonDocument resDoc;
+    DeserializationError err = deserializeJson(resDoc, responseBody);
+    if (!err && resDoc.is<JsonArray>() && resDoc.size() > 0) {
+      for (JsonObject res : resDoc.as<JsonArray>()) {
+        if (!res["document"].isNull()) {
+          JsonObject fields = res["document"]["fields"];
+          // Has timed in, but timeOut is null (open shift)
+          if (!fields["timeIn"].isNull() && fields["timeOut"].isNull()) {
+            status.hasOpenShift = true;
+            String docPath = res["document"]["name"].as<String>();
+            int lastSlash = docPath.lastIndexOf('/');
+            if (lastSlash != -1) {
+              status.attendanceDocId = docPath.substring(lastSlash + 1);
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  return status;
+}
+
+// ---- Check if Employee Already Completed Shift Today ----
 bool hasAlreadyTappedToday(const String& employeeName) {
   if (WiFi.status() != WL_CONNECTED || employeeName.length() == 0) return false;
 
@@ -238,8 +341,7 @@ bool hasAlreadyTappedToday(const String& employeeName) {
       for (JsonObject res : resDoc.as<JsonArray>()) {
         if (!res["document"].isNull()) {
           JsonObject fields = res["document"]["fields"];
-          // Check if attendance record exists for today (has timeIn)
-          if (!fields["timeIn"].isNull()) {
+          if (!fields["timeIn"].isNull() && fields["timeOut"].isNull() && !isTimeoutWindow()) {
             return true;
           }
         }
@@ -296,20 +398,43 @@ void processCardScan(const String& uid) {
     return;
   }
 
-  // 2. Check if already tapped today
-  if (hasAlreadyTappedToday(emp.fullName)) {
-    Serial.println("ALREADY TAPPED TODAY: " + emp.fullName);
-    showScreen(emp.fullName, "ALREADY TAPPED", "Already recorded");
-    beepFail();
-    return;
+  // 2. Check current Philippine time via NTP
+  struct tm timeinfo;
+  bool timeSynced = getLocalTime(&timeinfo);
+  int currentHour = timeSynced ? timeinfo.tm_hour : 19;
+
+  // Check if employee has an open shift (already timed in)
+  AttendanceStatus attStatus = getEmployeeAttendanceStatus(emp.fullName);
+
+  if (attStatus.hasOpenShift) {
+    // Attempting Time Out before 2:00 AM (02:00)
+    if (currentHour < 2) {
+      Serial.println("TIME OUT BLOCKED: Before 2:00 AM for " + emp.fullName);
+      showScreen(emp.fullName, "Time Out Opens", "at 2:00 AM");
+      beepFail();
+      return;
+    }
+  } else {
+    // Attempting Time In - check duplicate tap
+    if (hasAlreadyTappedToday(emp.fullName)) {
+      Serial.println("ALREADY TAPPED TODAY: " + emp.fullName);
+      showScreen(emp.fullName, "ALREADY TAPPED", "Already recorded");
+      beepFail();
+      return;
+    }
   }
 
-  // 3. Push Scan to Firebase for real-time app sync & attendance logging
+  // 3. Determine Action: Time In vs Time Out
+  bool timeoutMode = (currentHour == 2 && timeinfo.tm_min >= 0 && timeinfo.tm_min <= 30);
+  String timeStr = getCurrentTimeString();
+  String actionLabel = timeoutMode ? "TIME OUT " + timeStr : "TIME IN " + timeStr;
+
+  // 4. Push Scan to Firebase for real-time app sync & attendance logging
   postRfidScanToFirebase(uid, emp.fullName);
 
-  // 4. Display Success Result on OLED & Play Sound
-  Serial.printf("ATTENDANCE SUCCESS! Employee: %s\n", emp.fullName.c_str());
-  showScreen(emp.fullName, "ATTENDANCE", emp.email.length() > 0 ? emp.email : uid);
+  // 5. Display Success Result on OLED & Play Sound
+  Serial.printf("ATTENDANCE SUCCESS! Employee: %s | Action: %s\n", emp.fullName.c_str(), actionLabel.c_str());
+  showScreen(emp.fullName, actionLabel, emp.email.length() > 0 ? emp.email : uid);
   beepOk();
 }
 
@@ -329,7 +454,7 @@ void setup() {
   rfid.PCD_Init();
   rfid.PCD_DumpVersionToSerial();
 
-  // Connect to WiFi
+  // Connect to WiFi & Sync NTP Time
   connectWifi();
 
   showScreen("Overnight Cafe", "TAP CARD", "Ready for Shift");
@@ -360,11 +485,11 @@ void loop() {
     rfid.PICC_HaltA();
 
     // Short display pause
-    delay(1500);
+    delay(1200);
 
     // Debounce: Wait until card is lifted/removed from reader
     unsigned long removeStart = millis();
-    while (rfid.PICC_IsNewCardPresent() && millis() - removeStart < 2000) {
+    while (rfid.PICC_IsNewCardPresent() && millis() - removeStart < 1500) {
       rfid.PICC_HaltA();
       delay(50);
     }
