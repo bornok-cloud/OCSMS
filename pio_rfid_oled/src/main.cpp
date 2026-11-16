@@ -251,7 +251,7 @@ void processCardScan(const String& uid) {
   }
 }
 
-// ---- Setup ----
+// ---- Setup: Automatic Initialization on Power Up ----
 void setup() {
   Serial.begin(115200);
   Serial.println("\n--- Overnight Cafe RFID Attendance Scanner ---");
@@ -262,19 +262,20 @@ void setup() {
   Serial.println(oledOk ? "OLED Display Ready." : "OLED Display not detected.");
   showScreen("Overnight Cafe", "Starting...");
 
-  // Initialize MFRC522 RFID Reader
+  // Initialize MFRC522 RFID Reader Hardware
   SPI.begin(18, 19, 23, SS_PIN);
   rfid.PCD_Init();
+  rfid.PCD_SetAntennaGain(MFRC522::PICC_ANTSEL_100p);
   rfid.PCD_DumpVersionToSerial();
 
   // Connect to WiFi
   connectWifi();
 
   showScreen("Overnight Cafe", "TAP CARD", "Ready for Shift");
-  Serial.println("System Ready. Please tap your RFID card.");
+  Serial.println("System Ready. Automatic continuous scanning enabled.");
 }
 
-// ---- Main Loop ----
+// ---- Main Continuous Loop ----
 void loop() {
   // Reconnect WiFi if disconnected
   if (WiFi.status() != WL_CONNECTED) {
@@ -285,7 +286,7 @@ void loop() {
     }
   }
 
-  // Look for new RFID card tap
+  // Continuous Non-Blocking Card Scan
   if (!rfid.PICC_IsNewCardPresent()) return;
   if (!rfid.PICC_ReadCardSerial()) return;
 
@@ -293,15 +294,23 @@ void loop() {
   if (uid.length() > 0) {
     processCardScan(uid);
 
-    // Stop Crypto and Halt card communication
+    // Stop Crypto and Halt PICC communication
     rfid.PCD_StopCrypto1();
     rfid.PICC_HaltA();
 
-    // Short pause for user display
-    delay(1800);
+    // Short display pause
+    delay(1500);
 
-    // Re-initialize PCD antenna state so consecutive cards are detected reliably
+    // Debounce: Wait until card is lifted/removed from reader
+    unsigned long removeStart = millis();
+    while (rfid.PICC_IsNewCardPresent() && millis() - removeStart < 2000) {
+      rfid.PICC_HaltA();
+      delay(100);
+    }
+
+    // Full PCD Reader State Hard Reset to guarantee 100% reliable consecutive scans
     rfid.PCD_Init();
+    rfid.PCD_SetAntennaGain(MFRC522::PICC_ANTSEL_100p);
 
     showScreen("Overnight Cafe", "TAP CARD", "Ready for Shift");
   }
