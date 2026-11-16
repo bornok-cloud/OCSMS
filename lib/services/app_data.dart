@@ -3380,6 +3380,16 @@ class AppData extends ChangeNotifier {
     // yet, so we don't mistake a stale open record for tonight's shift.
     await autoCloseOverdueAttendance();
 
+    // Prevent duplicate taps if already recorded for current shift
+    final existingShiftRecord = attendanceForCurrentShift(employeeName);
+    if (existingShiftRecord != null) {
+      if (existingShiftRecord.hasTimedOut) {
+        throw Exception('Already tapped the RFID');
+      } else {
+        throw Exception('Already tapped the RFID (Time In recorded for tonight\'s shift).');
+      }
+    }
+
     final openRecord = openAttendanceFor(employeeName);
 
     if (openRecord != null) {
@@ -3387,9 +3397,13 @@ class AppData extends ChangeNotifier {
       final shiftDate = DateTime(openRecord.date.year, openRecord.date.month, openRecord.date.day);
       final shiftTimes = _shiftTimesFor(shiftDate);
       final timeoutStart = shiftTimes.end.subtract(const Duration(minutes: 30)); // 2:00 AM
+      final timeoutEnd = shiftTimes.end; // 2:30 AM
 
       if (now.isBefore(timeoutStart)) {
         throw Exception('Time out is only allowed from 2:00 AM to 2:30 AM.');
+      }
+      if (now.isAfter(timeoutEnd)) {
+        throw Exception('Time out window has passed (2:00 AM - 2:30 AM).');
       }
 
       // A shift is open -> this scan is a Time Out.
