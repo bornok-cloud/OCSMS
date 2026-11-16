@@ -15,21 +15,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   final String _method = 'RFID';
   AttendanceRecord? _lastRecord;
   bool _lastActionWasTimeOut = false;
-  String? _errorMessage;
 
-  void _scan(bool? willBeTimeOut) {
-    if (willBeTimeOut == null) {
-      setState(() {
-        _errorMessage = 'Already tapped the RFID. You have already timed in for today\'s shift.';
-      });
-      showAppSnack(context, _errorMessage!, success: false);
-      return;
-    }
-
+  void _scan(bool willBeTimeOut) {
     setState(() {
       _scanning = true;
       _lastRecord = null;
-      _errorMessage = null;
     });
     Future.delayed(const Duration(seconds: 2), () async {
       if (!mounted) return;
@@ -45,16 +35,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           _scanning = false;
           _lastRecord = record;
           _lastActionWasTimeOut = willBeTimeOut;
-          _errorMessage = null;
         });
       } catch (e) {
-        setState(() {
-          _scanning = false;
-          _errorMessage = e.toString().replaceFirst('Exception: ', '');
-        });
+        setState(() => _scanning = false);
         if (!mounted) return;
         showAppSnack(
-            context, _errorMessage!,
+            context, e.toString().replaceFirst('Exception: ', ''),
             success: false);
       }
     });
@@ -126,11 +112,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           color: AppColors.darkBrown)),
                   const SizedBox(height: 20),
                   GestureDetector(
-                    onTap: (!_scanning)
+                    onTap: (!_scanning && nextIsTimeOut != null)
                         ? () => _scan(nextIsTimeOut)
                         : null,
                     child: Opacity(
-                      opacity: 1,
+                      opacity: nextIsTimeOut == null ? 0.4 : 1,
                       child: Container(
                         width: 180,
                         height: 180,
@@ -138,7 +124,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           color: AppColors.beige,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                              color: _errorMessage != null ? AppColors.danger : AppColors.brown.withValues(alpha: 0.4),
+                              color: AppColors.brown.withValues(alpha: 0.4),
                               width: 2,
                               style: BorderStyle.solid),
                         ),
@@ -163,38 +149,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                                   : (!withinWindow
                                       ? ''
                                       : 'You have already timed in and out for tonight\'s shift.'))
-                              : 'Tap the scan area to simulate a scan'),
+                              : 'Tap your physical RFID card on the reader to simulate / time in'),
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: AppColors.textMuted)),
-                  if (_errorMessage != null) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.danger.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.danger, width: 1.5),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _errorMessage!,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: AppColors.danger,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 13.5,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                   if (_lastRecord != null) ...[
                     const SizedBox(height: 16),
                     Container(
