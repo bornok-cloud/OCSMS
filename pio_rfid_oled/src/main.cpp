@@ -290,12 +290,19 @@ void loop() {
   if (!rfid.PICC_ReadCardSerial()) return;
 
   String uid = readUid();
-  processCardScan(uid);
+  if (uid.length() > 0) {
+    processCardScan(uid);
 
-  // Halt PICC & Stop Crypto
-  rfid.PICC_HaltA();
-  rfid.PCD_StopCrypto1();
+    // Stop Crypto and Halt card communication
+    rfid.PCD_StopCrypto1();
+    rfid.PICC_HaltA();
 
-  delay(3000);
-  showScreen("Overnight Cafe", "TAP CARD", "Ready for Shift");
+    // Short pause for user display
+    delay(1800);
+
+    // Re-initialize PCD antenna state so consecutive cards are detected reliably
+    rfid.PCD_Init();
+
+    showScreen("Overnight Cafe", "TAP CARD", "Ready for Shift");
+  }
 }
