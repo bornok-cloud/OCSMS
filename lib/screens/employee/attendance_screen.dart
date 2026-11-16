@@ -17,7 +17,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   bool _lastActionWasTimeOut = false;
   String? _errorMessage;
 
-  void _scan(bool willBeTimeOut) {
+  void _scan(bool? willBeTimeOut) {
+    if (willBeTimeOut == null) {
+      setState(() {
+        _errorMessage = 'Already tapped the RFID. You have already timed in for today\'s shift.';
+      });
+      showAppSnack(context, _errorMessage!, success: false);
+      return;
+    }
+
     setState(() {
       _scanning = true;
       _lastRecord = null;
@@ -118,11 +126,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           color: AppColors.darkBrown)),
                   const SizedBox(height: 20),
                   GestureDetector(
-                    onTap: (!_scanning && nextIsTimeOut != null)
+                    onTap: (!_scanning)
                         ? () => _scan(nextIsTimeOut)
                         : null,
                     child: Opacity(
-                      opacity: nextIsTimeOut == null ? 0.4 : 1,
+                      opacity: 1,
                       child: Container(
                         width: 180,
                         height: 180,
@@ -130,7 +138,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           color: AppColors.beige,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                              color: AppColors.brown.withValues(alpha: 0.4),
+                              color: _errorMessage != null ? AppColors.danger : AppColors.brown.withValues(alpha: 0.4),
                               width: 2,
                               style: BorderStyle.solid),
                         ),
