@@ -575,8 +575,13 @@ void processCardScan(const String& uid) {
       return;
     }
   } else {
-    // No open shift -> only Time In is valid, and only from 6:30 PM
-    if (completedShift || !inTimeInWindow) {
+    // No open shift -> only Time In is valid. Prevent multiple Time Ins for the same shift unless Admin resets attendance.
+    if (completedShift) {
+      Serial.println("TIME IN BLOCKED (ALREADY COMPLETED): " + emp.fullName);
+      showError(emp.fullName, "Already Timed In", "Need Admin Reset");
+      return;
+    }
+    if (!inTimeInWindow) {
       Serial.println("TIME IN NOT OPEN: " + emp.fullName);
       showError(emp.fullName, "Time In Opens at 6:30 PM", "");
       return;
