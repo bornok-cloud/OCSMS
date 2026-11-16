@@ -185,6 +185,7 @@ EmployeeMatch findEmployeeByRfid(const String& uid) {
   client.setInsecure(); // SSL Connection for HTTPS Firestore API
 
   HTTPClient http;
+  http.setTimeout(3000);
   String queryUrl = "https://firestore.googleapis.com/v1/projects/" + String(FIREBASE_PROJECT_ID) + "/databases/(default)/documents:runQuery";
 
   http.begin(client, queryUrl);
@@ -251,6 +252,7 @@ AttendanceStatus getEmployeeAttendanceStatus(const String& employeeName) {
   client.setInsecure();
 
   HTTPClient http;
+  http.setTimeout(3000);
   String queryUrl = "https://firestore.googleapis.com/v1/projects/" + String(FIREBASE_PROJECT_ID) + "/databases/(default)/documents:runQuery";
 
   http.begin(client, queryUrl);
@@ -309,6 +311,7 @@ bool hasAlreadyTappedToday(const String& employeeName) {
   client.setInsecure();
 
   HTTPClient http;
+  http.setTimeout(3000);
   String queryUrl = "https://firestore.googleapis.com/v1/projects/" + String(FIREBASE_PROJECT_ID) + "/databases/(default)/documents:runQuery";
 
   http.begin(client, queryUrl);
@@ -360,6 +363,7 @@ bool postRfidScanToFirebase(const String& uid, const String& employeeName = "") 
   client.setInsecure();
 
   HTTPClient http;
+  http.setTimeout(3000);
   String postUrl = "https://firestore.googleapis.com/v1/projects/" + String(FIREBASE_PROJECT_ID) + "/databases/(default)/documents/rfidScans";
 
   http.begin(client, postUrl);
@@ -461,42 +465,69 @@ void setup() {
   Serial.println("System Ready. Continuous loop active.");
 }
 
-// ---- Main Continuous Loop ----
+// ---- Main Non-Blocking Continuous Loop ----
 void loop() {
-  // Reconnect WiFi if disconnected
+  unsigned long now = millis();
+
+  // Reconnect WiFi in background if disconnected
   if (WiFi.status() != WL_CONNECTED) {
     static unsigned long lastRetry = 0;
-    if (millis() - lastRetry > 15000) {
-      lastRetry = millis();
+    if (now - lastRetry > 15000) {
+      lastRetry = now;
       WiFi.reconnect();
     }
   }
 
-  // Continuous Non-Blocking Card Scan Loop
-  if (!rfid.PICC_IsNewCardPresent()) return;
-  if (!rfid.PICC_ReadCardSerial()) return;
+  // Non-blocking screen reset timer
+  static unsigned long lastScanTime = 0;
+  static String lastScannedUid = "";
+  static unsigned long screenResetTime = 0;
+  static bool screenNeedsReset = false;
+  static unsigned long lastPcdInitTime = 0;
+
+  if (screenNeedsReset && now >= screenResetTime) {
+    screenNeedsReset = false;
+    showScreen("Overnight Cafe", "TAP CARD", "Ready for Shift");
+  }
+
+  // Periodic defensive PCD re-init every 10 seconds to prevent MFRC522 freezing
+  if (now - lastPcdInitTime > 10000) {
+    lastPcdInitTime = now;
+    rfid.PCD_Init();
+  }
+
+  // Check if a card is present
+  if (!rfid.PICC_IsNewCardPresent()) {
+    lastScannedUid = ""; // Reset last UID when card is removed so re-tapping works
+    return;
+  }
+
+  if (!rfid.PICC_ReadCardSerial()) {
+    return;
+  }
 
   String uid = readUid();
+
+  // Always halt PICC and stop crypto immediately after reading UID
+  rfid.PICC_HaltA();
+  rfid.PCD_StopCrypto1();
+
+  // Non-blocking Cooldown check: ignore if same card is tapped within 2 seconds
+  if (uid == lastScannedUid && (now - lastScanTime < 2000)) {
+    return;
+  }
+
   if (uid.length() > 0) {
+    lastScanTime = now;
+    lastScannedUid = uid;
+
     processCardScan(uid);
 
-    // Stop Crypto and Halt PICC communication
-    rfid.PCD_StopCrypto1();
-    rfid.PICC_HaltA();
+    // Schedule screen reset 2 seconds later (non-blocking)
+    screenResetTime = millis() + 2000;
+    screenNeedsReset = true;
 
-    // Short display pause
-    delay(1200);
-
-    // Debounce: Wait until card is lifted/removed from reader
-    unsigned long removeStart = millis();
-    while (rfid.PICC_IsNewCardPresent() && millis() - removeStart < 1500) {
-      rfid.PICC_HaltA();
-      delay(50);
-    }
-
-    // Full PCD Reader State Hard Reset to guarantee 100% reliable consecutive loops
+    // Hard reset PCD reader state so next card scan is 100% responsive
     rfid.PCD_Init();
-
-    showScreen("Overnight Cafe", "TAP CARD", "Ready for Shift");
   }
 }
