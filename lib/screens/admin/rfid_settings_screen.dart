@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../theme/app_theme.dart';
 import '../../services/app_data.dart';
 import '../../models/models.dart';
@@ -23,97 +25,201 @@ class _RfidSettingsScreenState extends State<RfidSettingsScreen> {
 
   void _openRegisterDialog(AppUser user) {
     final tagCtrl = TextEditingController(text: user.rfidCardId ?? '');
+    final focusNode = FocusNode();
+    StreamSubscription? rfidSub;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.nfc_outlined, color: AppColors.accent, size: 22),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Register RFID Card — ${user.fullName}',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.darkBrown),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SelectableText(
-              'Employee System UID: ${user.id}',
-              style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Tap or scan an RFID card/tag using your RFID reader, or type the Card Tag UID below:',
-              style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: tagCtrl,
-              autofocus: true,
-              textCapitalization: TextCapitalization.characters,
-              decoration: InputDecoration(
-                labelText: 'RFID Card Tag UID',
-                hintText: 'e.g. RFID-882910 or A1B2C3D4',
-                prefixIcon: const Icon(Icons.credit_card_rounded),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            style: TextButton.styleFrom(foregroundColor: AppColors.darkBrown),
-            child: const Text('Cancel'),
-          ),
-          if (user.rfidCardId != null && user.rfidCardId!.isNotEmpty)
-            OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.danger,
-                side: const BorderSide(color: AppColors.danger),
-              ),
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await AppData.instance.updateEmployeeRfidCard(user.id, '');
-                if (mounted) {
-                  showAppSnack(context, 'Unlinked RFID Card for ${user.fullName}.');
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) {
+          rfidSub ??= FirebaseFirestore.instance.collection('rfidScans').snapshots().listen((snapshot) {
+            for (final change in snapshot.docChanges) {
+              if (change.type == DocumentChangeType.added) {
+                final data = change.doc.data();
+                final tag = (data?['rfidTag'] as String? ?? data?['cardId'] as String? ?? '').trim();
+                if (tag.isNotEmpty) {
+                  setDialogState(() {
+                    tagCtrl.text = tag;
+                  });
                 }
-              },
-              child: const Text('Unlink Card'),
-            ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.darkBrown,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () async {
-              final newTag = tagCtrl.text.trim();
-              if (newTag.isEmpty) {
-                showAppSnack(context, 'Please enter a valid RFID Card Tag ID.', success: false);
-                return;
               }
-              Navigator.pop(ctx);
-              await AppData.instance.updateEmployeeRfidCard(user.id, newTag);
-              if (mounted) {
-                showAppSnack(context, 'RFID Card "$newTag" registered to ${user.fullName}!');
-              }
-            },
-            child: const Text('Save Registration'),
-          ),
-        ],
+            }
+          });
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            backgroundColor: AppColors.cardWhite,
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: const BoxDecoration(
+                    color: AppColors.darkBrown,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.nfc_rounded, color: Colors.white, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'TAP RFID CARD TO REGISTER',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: AppColors.textMuted),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        user.fullName,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.darkBrown),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 380,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Target Account Box
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.cream,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.beigeDark),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.email_outlined, size: 14, color: AppColors.darkBrown),
+                            SizedBox(width: 6),
+                            Text('TARGET ACCOUNT EMAIL:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.textMuted, letterSpacing: 1.0)),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        SelectableText(
+                          user.email.isNotEmpty ? user.email : 'No email attached (${user.fullName})',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.darkBrown),
+                        ),
+                        const SizedBox(height: 4),
+                        SelectableText(
+                          'Employee System UID: ${user.id}',
+                          style: const TextStyle(fontSize: 10.5, color: AppColors.textMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Tap Card Sensor Graphic Box
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: AppShadows.soft,
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withValues(alpha: 0.12),
+                            border: Border.all(color: AppColors.accent, width: 2),
+                          ),
+                          child: const Icon(Icons.sensors_rounded, size: 32, color: AppColors.accent),
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'PLEASE TAP RFID CARD ON SCANNER NOW',
+                          style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Card UID will automatically capture and merge with this account email.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white70, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Tag Input Field
+                  TextField(
+                    controller: tagCtrl,
+                    focusNode: focusNode,
+                    autofocus: true,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: InputDecoration(
+                      labelText: 'Scanned Card Tag UID',
+                      hintText: 'e.g. CARD-882910 or A1B2C3D4',
+                      prefixIcon: const Icon(Icons.credit_card_rounded, color: AppColors.darkBrown),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onChanged: (_) => setDialogState(() {}),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  rfidSub?.cancel();
+                  Navigator.pop(ctx);
+                },
+                style: TextButton.styleFrom(foregroundColor: AppColors.darkBrown),
+                child: const Text('Cancel'),
+              ),
+              if (user.rfidCardId != null && user.rfidCardId!.isNotEmpty)
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.danger,
+                    side: const BorderSide(color: AppColors.danger),
+                  ),
+                  onPressed: () async {
+                    rfidSub?.cancel();
+                    Navigator.pop(ctx);
+                    await AppData.instance.updateEmployeeRfidCard(user.id, '');
+                    if (mounted) {
+                      showAppSnack(context, 'Unlinked RFID Card from ${user.email}.');
+                    }
+                  },
+                  child: const Text('Unlink Card'),
+                ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.darkBrown,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () async {
+                  final newTag = tagCtrl.text.trim();
+                  if (newTag.isEmpty) {
+                    showAppSnack(context, 'Please tap an RFID card or enter a valid Tag UID.', success: false);
+                    return;
+                  }
+                  rfidSub?.cancel();
+                  Navigator.pop(ctx);
+                  await AppData.instance.updateEmployeeRfidCard(user.id, newTag);
+                  if (mounted) {
+                    showAppSnack(context, 'RFID Card "$newTag" successfully merged & linked to ${user.email} (${user.fullName})!');
+                  }
+                },
+                child: const Text('Merge & Link to Account'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
