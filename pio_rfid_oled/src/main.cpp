@@ -174,17 +174,17 @@ EmployeeMatch findEmployeeByRfid(const String& uid) {
     DeserializationError err = deserializeJson(resDoc, responseBody);
     if (!err && resDoc.is<JsonArray>() && resDoc.size() > 0) {
       JsonObject firstRes = resDoc[0];
-      if (firstRes.containsKey("document")) {
+      if (!firstRes["document"].isNull()) {
         JsonObject fields = firstRes["document"]["fields"];
         match.found = true;
 
-        if (fields.containsKey("fullName")) {
+        if (!fields["fullName"].isNull()) {
           match.fullName = fields["fullName"]["stringValue"].as<String>();
         }
-        if (fields.containsKey("email")) {
+        if (!fields["email"].isNull()) {
           match.email = fields["email"]["stringValue"].as<String>();
         }
-        if (firstRes["document"].containsKey("name")) {
+        if (!firstRes["document"]["name"].isNull()) {
           String docPath = firstRes["document"]["name"].as<String>();
           int lastSlash = docPath.lastIndexOf('/');
           if (lastSlash != -1) {
@@ -265,14 +265,13 @@ void setup() {
   // Initialize MFRC522 RFID Reader Hardware
   SPI.begin(18, 19, 23, SS_PIN);
   rfid.PCD_Init();
-  rfid.PCD_SetAntennaGain(MFRC522::PICC_ANTSEL_100p);
   rfid.PCD_DumpVersionToSerial();
 
   // Connect to WiFi
   connectWifi();
 
   showScreen("Overnight Cafe", "TAP CARD", "Ready for Shift");
-  Serial.println("System Ready. Automatic continuous scanning enabled.");
+  Serial.println("System Ready. Continuous loop active.");
 }
 
 // ---- Main Continuous Loop ----
@@ -286,7 +285,7 @@ void loop() {
     }
   }
 
-  // Continuous Non-Blocking Card Scan
+  // Continuous Non-Blocking Card Scan Loop
   if (!rfid.PICC_IsNewCardPresent()) return;
   if (!rfid.PICC_ReadCardSerial()) return;
 
@@ -299,18 +298,17 @@ void loop() {
     rfid.PICC_HaltA();
 
     // Short display pause
-    delay(1500);
+    delay(1200);
 
     // Debounce: Wait until card is lifted/removed from reader
     unsigned long removeStart = millis();
-    while (rfid.PICC_IsNewCardPresent() && millis() - removeStart < 2000) {
+    while (rfid.PICC_IsNewCardPresent() && millis() - removeStart < 1500) {
       rfid.PICC_HaltA();
-      delay(100);
+      delay(50);
     }
 
-    // Full PCD Reader State Hard Reset to guarantee 100% reliable consecutive scans
+    // Full PCD Reader State Hard Reset to guarantee 100% reliable consecutive loops
     rfid.PCD_Init();
-    rfid.PCD_SetAntennaGain(MFRC522::PICC_ANTSEL_100p);
 
     showScreen("Overnight Cafe", "TAP CARD", "Ready for Shift");
   }
