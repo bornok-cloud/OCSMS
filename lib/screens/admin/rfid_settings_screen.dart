@@ -208,6 +208,27 @@ class _RfidSettingsScreenState extends State<RfidSettingsScreen> {
                     showAppSnack(context, 'Please tap an RFID card or enter a valid Tag UID.', success: false);
                     return;
                   }
+
+                  // Validation: Prevent duplicate RFID card assignment to another employee
+                  AppUser? existingOwner;
+                  for (final u in AppData.instance.users) {
+                    if (u.id != user.id &&
+                        u.rfidCardId != null &&
+                        u.rfidCardId!.trim().toLowerCase() == newTag.toLowerCase()) {
+                      existingOwner = u;
+                      break;
+                    }
+                  }
+
+                  if (existingOwner != null) {
+                    showAppSnack(
+                      context,
+                      'RFID Card "$newTag" is already assigned to ${existingOwner.fullName} (${existingOwner.email.isNotEmpty ? existingOwner.email : 'User'})!',
+                      success: false,
+                    );
+                    return;
+                  }
+
                   rfidSub?.cancel();
                   Navigator.pop(ctx);
                   await AppData.instance.updateEmployeeRfidCard(user.id, newTag);

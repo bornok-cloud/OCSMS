@@ -246,7 +246,7 @@ void processCardScan(const String& uid) {
     beepOk();
   } else {
     Serial.println("UNREGISTERED CARD. Card UID posted to rfidScans for admin linking.");
-    showScreen("UNREGISTERED", "Card Unlinked", "UID: " + uid);
+    showScreen("Unregistered Card", "Not Linked", "UID: " + uid);
     beepFail();
   }
 }
