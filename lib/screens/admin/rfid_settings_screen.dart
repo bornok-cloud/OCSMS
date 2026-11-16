@@ -50,6 +50,11 @@ class _RfidSettingsScreenState extends State<RfidSettingsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            SelectableText(
+              'Employee System UID: ${user.id}',
+              style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
             const Text(
               'Tap or scan an RFID card/tag using your RFID reader, or type the Card Tag UID below:',
               style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
@@ -356,7 +361,36 @@ class _RfidSettingsScreenState extends State<RfidSettingsScreen> {
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 3),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.badge_outlined,
+                                    size: 13,
+                                    color: AppColors.textMuted,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  SelectableText(
+                                    'UID: ${user.id}',
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      color: AppColors.textMuted,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  if (user.employeeId != null && user.employeeId!.isNotEmpty) ...[
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '•  ID: ${user.employeeId}',
+                                      style: const TextStyle(
+                                        fontSize: 11.5,
+                                        color: AppColors.textMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 3),
                               Row(
                                 children: [
                                   Icon(
