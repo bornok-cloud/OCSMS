@@ -2842,51 +2842,19 @@ class AppData extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Expires a customer Kiosk order once its 20-minute Order ID countdown has
-  /// lapsed, so it drops out of the employee's Pending Orders at the same
-  /// moment the customer-side card disappears. Only a still-'Pending' order is
-  /// affected \u2014 an order the employee has already accepted (moved to
-  /// 'Preparing'/'Ready') is left running untouched.
+  /// Automatic cancellation is disabled so pending customer orders
+  /// stay active until managed, accepted, or completed by employee or admin.
   Future<void> expireKioskOrder(String orderId) async {
-    try {
-      final ref =
-          FirebaseFirestore.instance.collection('kioskOrders').doc(orderId);
-      final snap = await ref.get();
-      if (!snap.exists) return;
-      final status = (snap.data()?['status'] as String?) ?? 'Pending';
-      if (status != 'Pending') return;
-      await ref.update({'status': 'Expired'});
-      notifyListeners();
-    } catch (e) {
-      debugPrint('expireKioskOrder error: $e');
-    }
+    return;
   }
 
-  /// Safety net for orders whose customer never reported the countdown
-  /// finishing (e.g. the app was closed first): any still-'Pending' order
-  /// whose stored [OrderRecord.expiresAt] has passed is expired. Called
-  /// periodically by [_startExpirySweep].
+  /// Safety net for expired orders disabled per user request.
   Future<void> purgeExpiredKioskOrders() async {
-    final now = DateTime.now();
-    final stale = kioskOrders
-        .where((o) =>
-            o.status == 'Pending' &&
-            o.expiresAt != null &&
-            o.expiresAt!.isBefore(now))
-        .map((o) => o.id)
-        .toList();
-    for (final id in stale) {
-      await expireKioskOrder(id);
-    }
+    return;
   }
 
-  /// Starts the periodic expiry sweep once. The sweep keeps the employee's
-  /// Pending Orders in sync with the customer countdown even when the
-  /// customer's app is no longer in the foreground.
   void _startExpirySweep() {
-    _expirySweep ??= Timer.periodic(const Duration(seconds: 20), (_) {
-      purgeExpiredKioskOrders();
-    });
+    return;
   }
 
   // ===================== PAYROLL =====================
