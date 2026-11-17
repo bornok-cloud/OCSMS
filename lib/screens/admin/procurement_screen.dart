@@ -49,13 +49,17 @@ class _ProcurementScreenState extends State<ProcurementScreen> {
             const SizedBox(height: 24),
             Builder(
               builder: (context) {
-                final searchField = TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Search ${_selectedTab.toLowerCase()} procurement...',
-                    prefixIcon: const Icon(Icons.search),
-                    isDense: true,
+                final searchField = SizedBox(
+                  height: 44,
+                  child: TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Search ${_selectedTab.toLowerCase()} procurement...',
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                    onChanged: (v) => setState(() => _search = v),
                   ),
-                  onChanged: (v) => setState(() => _search = v),
                 );
 
                 final inventoryChip = ChoiceChip(
@@ -70,32 +74,36 @@ class _ProcurementScreenState extends State<ProcurementScreen> {
                   onSelected: (sel) => setState(() => _selectedTab = 'Kitchen Item'),
                 );
 
-                final addItemButton = OutlinedButton.icon(
-                  onPressed: () => _restockDialog(context, null, _selectedTab),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add Item'),
+                final addItemButton = SizedBox(
+                  height: 44,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.darkBrown,
+                      side: const BorderSide(color: AppColors.darkBrown, width: 1.2),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () => _restockDialog(context, null, _selectedTab),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Add Item', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
                 );
 
                 return LayoutBuilder(
                   builder: (context, constraints) {
-                    final wide = constraints.maxWidth >= 750;
-                    if (wide) {
+                    final isWide = constraints.maxWidth >= 950;
+                    if (isWide) {
                       return Row(
                         children: [
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 260),
+                          Expanded(
+                            flex: 3,
                             child: searchField,
                           ),
-                          const Spacer(),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              inventoryChip,
-                              const SizedBox(width: 8),
-                              kitchenChip,
-                            ],
-                          ),
-                          const Spacer(),
+                          const SizedBox(width: 12),
+                          inventoryChip,
+                          const SizedBox(width: 8),
+                          kitchenChip,
+                          const SizedBox(width: 12),
                           addItemButton,
                         ],
                       );
@@ -103,7 +111,7 @@ class _ProcurementScreenState extends State<ProcurementScreen> {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // 2nd row: Search bar and Add Item button
+                          // 1st row: Search bar and Add Item button
                           Row(
                             children: [
                               Expanded(child: searchField),
@@ -112,7 +120,7 @@ class _ProcurementScreenState extends State<ProcurementScreen> {
                             ],
                           ),
                           const SizedBox(height: 10),
-                          // 3rd row: Inventory Items button and Kitchen Items button
+                          // 2nd row: Inventory Items chip and Kitchen Items chip
                           Row(
                             children: [
                               Expanded(child: Center(child: inventoryChip)),
